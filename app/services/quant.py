@@ -31,12 +31,8 @@ def robust_anomalies(amounts: List[float]) -> List[float]:
     
     log_vals = np.log(np.maximum(1e-6, arr))
     med_log = float(np.median(log_vals))
-    mad_log = float(np.median(np.abs(log_vals - med_log)))
-    
-    if mad_log < 1e-9:
-        med = float(np.median(arr))
-        return [float(4.0 if (med > 0 and x / med >= 3.0) else 0.0) for x in arr]
-        
+    mad_log = max(0.15, float(np.median(np.abs(log_vals - med_log))))
+
     mod_z = 0.6745 * (log_vals - med_log) / mad_log
     return [float(z) for z in mod_z]
 
@@ -106,11 +102,12 @@ def monte_carlo_goal(
     for m in range(months):
         wealth = wealth * (1.0 + r_sim[:, m]) + s_sim[:, m]
         wealth = np.maximum(0.0, wealth)
+        p10, p50, p90 = np.percentile(wealth, [10, 50, 90])
         paths_percentiles.append({
             "month": m + 1,
-            "p10": round(float(np.percentile(wealth, 10)), 2),
-            "p50": round(float(np.percentile(wealth, 50)), 2),
-            "p90": round(float(np.percentile(wealth, 90)), 2)
+            "p10": round(float(p10), 2),
+            "p50": round(float(p50), 2),
+            "p90": round(float(p90), 2)
         })
         
     prob_success = float(np.mean(wealth >= target))

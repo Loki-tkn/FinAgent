@@ -1,9 +1,12 @@
 from typing import Dict, Any
+from datetime import datetime
 from app.database import get_db_connection
+
 
 def monthly_avg_expense(user_id: int = 1, exclude_anomalies: bool = True) -> Dict[str, Any]:
     """
-    Computes average monthly expenses normalized by distinct months in data.
+    Computes average monthly expenses normalized by distinct completed months.
+    Excludes the current calendar month when >= 2 completed months exist.
     If months_of_history < 2, uses users.est_monthly_expense (70/30 split) with low_data=True.
     """
     conn = get_db_connection()
@@ -22,8 +25,19 @@ def monthly_avg_expense(user_id: int = 1, exclude_anomalies: bool = True) -> Dic
     rows = cursor.fetchall()
     conn.close()
 
-    distinct_months = {r["date"][:7] for r in rows}
-    num_months = len(distinct_months)
+    current_ym = datetime.now().strftime("%Y-%m")
+    all_months = {r["date"][:7] for r in rows}
+    completed_months = {m for m in all_months if m < current_ym}
+
+    # Use completed months if >= 2, else fall back to all months
+    if len(completed_months) >= 2:
+        use_months = completed_months
+        use_rows = [r for r in rows if r["date"][:7] < current_ym]
+    else:
+        use_months = all_months
+        use_rows = list(rows)
+
+    num_months = len(use_months)
 
     # Low data condition (< 2 months of history)
     if num_months < 2:
@@ -58,7 +72,7 @@ def monthly_avg_expense(user_id: int = 1, exclude_anomalies: bool = True) -> Dic
     essential_spent = 0.0
     discretionary_spent = 0.0
 
-    for r in rows:
+    for r in use_rows:
         if exclude_anomalies and r["is_anomaly"]:
             continue
 

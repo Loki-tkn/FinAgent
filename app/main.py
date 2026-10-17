@@ -15,7 +15,9 @@ from app.routers import (
     audit,
     admin,
     profile,
-    quant
+    quant,
+    budgets,
+    recurring
 )
 
 @asynccontextmanager
@@ -45,6 +47,8 @@ app.include_router(quant.router)
 app.include_router(dashboard.router)
 app.include_router(transactions.router)
 app.include_router(goals.router)
+app.include_router(budgets.router)
+app.include_router(recurring.router)
 app.include_router(simulation.router)
 app.include_router(sandbox.router)
 app.include_router(audit.router)

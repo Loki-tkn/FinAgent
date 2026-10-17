@@ -31,19 +31,20 @@ def calculate_financial_health_score(
             "summary_recommendation": "Complete your profile setup to generate a financial health diagnostic."
         }
 
-    monthly_savings = max(0.0, monthly_income - total_monthly_expense)
-    savings_rate = (monthly_savings / monthly_income) * 100.0
+    monthly_savings = monthly_income - total_monthly_expense
+    savings_rate = (monthly_savings / monthly_income) * 100.0  # can be negative
+    savings_rate_for_score = max(0.0, savings_rate)
     essential_ratio = (essential_expense / monthly_income) * 100.0
     discretionary_ratio = (discretionary_expense / monthly_income) * 100.0
 
-    # 1. Savings Ratio (30 pts)
-    if savings_rate >= 30.0:
+    # 1. Savings Ratio (30 pts) — scored on non-negative rate
+    if savings_rate_for_score >= 30.0:
         savings_score = 30.0
-    elif savings_rate >= 20.0:
+    elif savings_rate_for_score >= 20.0:
         savings_score = 25.0
-    elif savings_rate >= 10.0:
+    elif savings_rate_for_score >= 10.0:
         savings_score = 18.0
-    elif savings_rate > 0.0:
+    elif savings_rate_for_score > 0.0:
         savings_score = 10.0
     else:
         savings_score = 0.0
@@ -69,7 +70,8 @@ def calculate_financial_health_score(
         discretionary_score = 3.0
 
     # 4. Emergency Buffer Runway in Months (25 pts)
-    eval_savings = emergency_fund_savings if (emergency_fund_savings is not None and emergency_fund_savings > 0) else current_savings
+    # Only use emergency_fund_savings if explicitly > 0; else use 0 (not current_savings fallback)
+    eval_savings = emergency_fund_savings if (emergency_fund_savings is not None and emergency_fund_savings > 0) else 0.0
     runway_months = (eval_savings / total_monthly_expense) if total_monthly_expense > 0 else 0
     
     target_months = max(1, emergency_target_months)
@@ -106,6 +108,7 @@ def calculate_financial_health_score(
         "rating": rating,
         "grade": grade,
         "needs_setup": False,
+        "provisional": False,
         "savings_rate_pct": round(savings_rate, 1),
         "runway_months": round(runway_months, 1),
         "breakdown": {

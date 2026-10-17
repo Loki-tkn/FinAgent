@@ -1,4 +1,5 @@
 import os
+import hmac
 from fastapi import Header, HTTPException, status, Request
 from typing import Optional
 
@@ -10,7 +11,9 @@ def resolve_role(request: Request) -> str:
         role = "User"
     if role == "Admin":
         admin_token = os.getenv("ADMIN_TOKEN")
-        if admin_token and request.headers.get("X-Admin-Token") != admin_token:
+        if admin_token and not hmac.compare_digest(
+            request.headers.get("X-Admin-Token", ""), admin_token
+        ):
             role = "User"
     return role
 

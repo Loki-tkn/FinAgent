@@ -18,7 +18,7 @@ class ProfileUpdate(BaseModel):
     emergency_months: Optional[int] = Field(default=None, ge=1, le=24)
     expected_return: Optional[float] = Field(default=None, ge=0.0, le=1.0)
     volatility: Optional[float] = Field(default=None, ge=0.0, le=1.0)
-    currency: Optional[Literal['USD', 'EUR', 'GBP', 'JPY', 'VND']] = None
+    currency: Optional[Literal['USD']] = None
 
 class RoleSwitchRequest(BaseModel):
     role: str = Field(..., description="Target role: Viewer, User, or Admin")
@@ -56,6 +56,7 @@ class TransactionResponse(BaseModel):
     is_essential: bool
     is_anomaly: bool
     anomaly_reason: Optional[str] = None
+    source: Optional[str] = "manual"
     created_at: Optional[str] = None
 
 # --- Anomaly ---
@@ -76,6 +77,10 @@ class AnomalyScanResponse(BaseModel):
     anomalies_detected: int
     anomalies: List[AnomalyItem]
     scan_timestamp: str
+    eligible_categories: int = 0
+    skipped_categories: List[Dict[str, Any]] = []
+    min_samples: int = 5
+    message: str = ""
 
 # --- Goals & Planner ---
 class GoalCreate(BaseModel):
@@ -261,3 +266,120 @@ class AuditLogResponse(BaseModel):
     status: str
     details: str
     ip_address: str
+
+# --- Monthly History ---
+class HistoryItem(BaseModel):
+    category: str
+    type: Literal['income', 'expense']
+    amount: float = Field(..., ge=0)
+
+class HistoryMonth(BaseModel):
+    month: str = Field(..., description="YYYY-MM")
+    items: List[HistoryItem]
+
+    @field_validator('month')
+    @classmethod
+    def validate_month(cls, v: str) -> str:
+        import re
+        if not re.match(r'^\d{4}-\d{2}$', v):
+            raise ValueError('Month must be YYYY-MM')
+        m = int(v.split('-')[1])
+        if not (1 <= m <= 12):
+            raise ValueError('Month must be between 01 and 12')
+        return v
+
+class HistoryImportRequest(BaseModel):
+    months: List[HistoryMonth] = Field(..., max_length=24)
+
+class HistoryImportResponse(BaseModel):
+    months_saved: int
+    rows_inserted: int
+
+# --- Transaction Update ---
+class TransactionUpdate(BaseModel):
+    category: Optional[str] = None
+    amount: Optional[float] = Field(default=None, gt=0)
+    type: Optional[Literal['income', 'expense']] = None
+    description: Optional[str] = None
+    date: Optional[str] = None
+
+    @field_validator('date')
+    @classmethod
+    def validate_date_format(cls, v: str) -> str:
+        if v is None:
+            return v
+        import re
+        if not re.match(r'^\d{4}-\d{2}-\d{2}$', v):
+            raise ValueError('Date must be in YYYY-MM-DD format')
+        return v
+
+# --- Goal Updates ---
+class GoalUpdate(BaseModel):
+    title: Optional[str] = Field(default=None, min_length=1)
+    target_amount: Optional[float] = Field(default=None, gt=0)
+    target_date: Optional[str] = None
+    notes: Optional[str] = None
+    monthly_contribution: Optional[float] = Field(default=None, ge=0)
+    status: Optional[Literal['In Progress', 'Paused', 'Completed']] = None
+
+    @field_validator('target_date')
+    @classmethod
+    def validate_target_date(cls, v: str) -> str:
+        if v is None:
+            return v
+        from datetime import date as dt_date
+        try:
+            d = dt_date.fromisoformat(v)
+            if d <= dt_date.today():
+                raise ValueError('Target date must be in the future')
+        except ValueError as e:
+            if 'future' in str(e):
+                raise
+            raise ValueError('Target date must be in YYYY-MM-DD format')
+        return v
+
+class GoalDepositRequest(BaseModel):
+    amount: float = Field(..., description="Positive = deposit, negative = withdrawal")
+    note: Optional[str] = None
+
+    @field_validator('amount')
+    @classmethod
+    def validate_nonzero(cls, v: float) -> float:
+        if v == 0:
+            raise ValueError('Amount cannot be zero')
+        return v
+
+# --- Category Update ---
+class CategoryUpdate(BaseModel):
+    name: Optional[str] = Field(default=None, min_length=1)
+    is_essential: Optional[bool] = None
+
+# --- Budgets ---
+class BudgetUpsert(BaseModel):
+    category: str
+    month_year: str = Field(..., description="YYYY-MM")
+    budget_limit: float = Field(..., ge=0)
+
+# --- Recurring Rules ---
+class RecurringRuleCreate(BaseModel):
+    type: Literal['income', 'expense']
+    category: str
+    amount: float = Field(..., gt=0)
+    description: str
+    day_of_month: int = Field(default=1, ge=1, le=28)
+
+class RecurringRuleUpdate(BaseModel):
+    amount: Optional[float] = Field(default=None, gt=0)
+    description: Optional[str] = None
+    day_of_month: Optional[int] = Field(default=None, ge=1, le=28)
+    active: Optional[bool] = None
+
+# --- CSV Import ---
+class CSVImportResponse(BaseModel):
+    total: int
+    valid: int
+    duplicates: int
+    errors: List[Dict[str, Any]]
+    preview: List[Dict[str, Any]]
+    imported: int
+

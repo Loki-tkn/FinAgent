@@ -6,6 +6,7 @@ from app.database import get_db_connection
 from app.schemas import MonteCarloGoalResponse, ForecastResponse, LoanVsCashRequest, LoanVsCashResponse
 from app.security import get_current_role
 from app.services.audit import record_audit_log
+from app.services.assumptions import goal_assumptions
 from app.services.quant import (
     required_monthly_payment,
     real_target,
@@ -55,7 +56,7 @@ def get_goal_monte_carlo(
         ORDER BY m ASC
     """, (user_id,))
     history_rows = cursor.fetchall()
-    
+
     # Extract total expense history months count for low_data check
     cursor.execute("""
         SELECT COUNT(DISTINCT strftime('%Y-%m', date)) FROM transactions WHERE user_id = ? AND type = 'expense'
@@ -69,29 +70,29 @@ def get_goal_monte_carlo(
     target_amount = float(goal["target_amount"])
     current_savings = float(goal["current_savings"])
     contrib = float(goal["monthly_contribution"]) if goal["monthly_contribution"] is not None else 0.0
-    
+
     # Calculate months remaining
+    now = datetime.now()
     try:
         target_dt = datetime.strptime(goal["target_date"], "%Y-%m-%d")
-        now = datetime.now()
         months_remaining = max(1, (target_dt.year - now.year) * 12 + (target_dt.month - now.month))
     except Exception:
         months_remaining = 12
 
-    prof_return = float(prof.get("expected_return", 0.05))
-    prof_vol = float(prof.get("volatility", 0.10))
-    if "Emergency" in goal["title"] or months_remaining <= 12:
-        default_return = min(prof_return, 0.03)
-        default_vol = min(prof_vol, 0.03)
-    else:
-        default_return = prof_return
-        default_vol = prof_vol
-
-    ann_return = ret if ret is not None else default_return
-    ann_vol = vol if vol is not None else default_vol
-    ann_inf = inf if inf is not None else float(prof.get("inflation", 0.03))
+    ann_return, ann_vol, ann_inf = goal_assumptions(goal["title"], months_remaining, prof)
+    if ret is not None:
+        ann_return = ret
+    if vol is not None:
+        ann_vol = vol
+    if inf is not None:
+        ann_inf = inf
 
     is_low_data = (exp_months_count < 3)
+
+    # Drop current month from history if >= 3 completed months
+    current_ym = now.strftime("%Y-%m")
+    completed_rows = [r for r in history_rows if r["m"] < current_ym]
+    working_rows = completed_rows if len(completed_rows) >= 3 else list(history_rows)
 
     if monthly_income <= 0:
         return {
@@ -114,12 +115,12 @@ def get_goal_monte_carlo(
             "low_data": False
         }
 
-    if is_low_data or len(history_rows) < 2:
+    if is_low_data or len(working_rows) < 2:
         est_exp = float(prof.get("est_monthly_expense", 0.0))
         mean_surplus = max(0.0, monthly_income - est_exp)
         hist_std = 0.15 * mean_surplus
     else:
-        surplus_list = [float(r["net"]) for r in history_rows]
+        surplus_list = [float(r["net"]) for r in working_rows]
         mean_surplus = float(np.mean(surplus_list))
         hist_std = float(np.std(surplus_list, ddof=1)) if len(surplus_list) > 1 else 0.15 * mean_surplus
 
@@ -193,7 +194,10 @@ def get_expense_forecast(role: str = Depends(get_current_role)):
     rows = cursor.fetchall()
     conn.close()
 
-    series = [float(r["exp"]) for r in rows]
+    current_ym = datetime.now().strftime("%Y-%m")
+    completed = [r for r in rows if r["m"] < current_ym]
+    chosen_rows = completed if len(completed) >= 3 else rows
+    series = [float(r["exp"]) for r in chosen_rows]
     num_hist = len(series)
     is_low_data = (num_hist < 3)
 

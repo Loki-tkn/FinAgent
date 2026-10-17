@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from typing import List, Dict, Any, Optional
 from app.database import get_db_connection
-from app.schemas import GoalCreate, GoalPlanResponse, ProgressStatus, SelectPlanRequest
+from app.schemas import GoalCreate, GoalPlanResponse, ProgressStatus, SelectPlanRequest, GoalUpdate, GoalDepositRequest
 from app.security import get_current_role, require_role
 from app.services.planner import generate_goal_plans
 from app.services.tracker import track_goal_progress
@@ -145,16 +145,180 @@ def select_plan_for_goal(
         SET selected_plan = ?, monthly_contribution = ?
         WHERE id = ? AND user_id = ?
     """, (req.plan_name, req.monthly_contribution, goal_id, user_id))
+    from app.services.budget_check import contribution_budget_check
+    over_budget, warning = contribution_budget_check(conn, user_id)
     conn.commit()
     conn.close()
+
+    audit_details = f"Selected '{req.plan_name}' plan with monthly contribution of ${req.monthly_contribution:,.0f}"
+    if over_budget:
+        audit_details += f" | OVER BUDGET: {warning}"
 
     record_audit_log(
         user_role=role,
         action_type="GOAL_PLAN_SELECT",
         resource=f"GOAL#{goal_id}",
         status="SUCCESS",
-        details=f"Selected '{req.plan_name}' plan with monthly contribution of ${req.monthly_contribution:,.0f}"
+        details=audit_details
     )
 
-    return {"message": f"Successfully activated {req.plan_name} plan for goal #{goal_id}."}
+    resp = {"message": f"Successfully activated {req.plan_name} plan for goal #{goal_id}."}
+    if over_budget:
+        resp["over_budget"] = True
+        resp["warning"] = warning
+    return resp
+
+
+@router.put("/{goal_id}", response_model=Dict[str, Any])
+def update_goal(
+    goal_id: int,
+    data: GoalUpdate,
+    role: str = Depends(require_role("User"))
+):
+    """Updates goal attributes. Validates budget if contribution changes."""
+    user_id = 1
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM goals WHERE id = ? AND user_id = ?", (goal_id, user_id))
+    existing = cursor.fetchone()
+    if not existing:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Goal not found")
+
+    updates = []
+    params = []
+    if data.title is not None:
+        updates.append("title = ?")
+        params.append(data.title.strip())
+    if data.target_amount is not None:
+        updates.append("target_amount = ?")
+        params.append(data.target_amount)
+    if data.target_date is not None:
+        updates.append("target_date = ?")
+        params.append(data.target_date)
+    if data.notes is not None:
+        updates.append("notes = ?")
+        params.append(data.notes)
+    if data.monthly_contribution is not None:
+        updates.append("monthly_contribution = ?")
+        params.append(data.monthly_contribution)
+    if data.status is not None:
+        updates.append("status = ?")
+        params.append(data.status)
+
+    if updates:
+        params.extend([goal_id, user_id])
+        cursor.execute(f"UPDATE goals SET {', '.join(updates)} WHERE id = ? AND user_id = ?", params)
+
+    over_budget = False
+    warning = None
+    if data.monthly_contribution is not None:
+        from app.services.budget_check import contribution_budget_check
+        over_budget, warning = contribution_budget_check(conn, user_id)
+
+    conn.commit()
+
+    cursor.execute("SELECT * FROM goals WHERE id = ? AND user_id = ?", (goal_id, user_id))
+    updated_goal = dict(cursor.fetchone())
+    conn.close()
+
+    audit_details = f"Updated goal #{goal_id}"
+    if over_budget:
+        audit_details += f" | OVER BUDGET: {warning}"
+
+    record_audit_log(
+        user_role=role,
+        action_type="GOAL_UPDATE",
+        resource=f"GOAL#{goal_id}",
+        status="SUCCESS",
+        details=audit_details
+    )
+
+    if over_budget:
+        updated_goal["over_budget"] = True
+        updated_goal["warning"] = warning
+
+    return updated_goal
+
+
+@router.delete("/{goal_id}", response_model=Dict[str, Any])
+def delete_goal(
+    goal_id: int,
+    role: str = Depends(require_role("User"))
+):
+    """Deletes a savings goal."""
+    user_id = 1
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, title FROM goals WHERE id = ? AND user_id = ?", (goal_id, user_id))
+    existing = cursor.fetchone()
+    if not existing:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Goal not found")
+
+    cursor.execute("DELETE FROM goals WHERE id = ? AND user_id = ?", (goal_id, user_id))
+    conn.commit()
+    conn.close()
+
+    record_audit_log(
+        user_role=role,
+        action_type="GOAL_DELETE",
+        resource=f"GOAL#{goal_id}",
+        status="SUCCESS",
+        details=f"Deleted goal #{goal_id} ({existing['title']})"
+    )
+
+    return {"message": f"Goal #{goal_id} deleted successfully."}
+
+
+@router.post("/{goal_id}/deposit", response_model=Dict[str, Any])
+def deposit_to_goal(
+    goal_id: int,
+    req: GoalDepositRequest,
+    role: str = Depends(require_role("User"))
+):
+    """Deposits or withdraws from goal savings. Updates goal status automatically."""
+    user_id = 1
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT * FROM goals WHERE id = ? AND user_id = ?", (goal_id, user_id))
+    goal = cursor.fetchone()
+    if not goal:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Goal not found")
+
+    curr_savings = float(goal["current_savings"])
+    target_amount = float(goal["target_amount"])
+    new_savings = round(curr_savings + req.amount, 2)
+
+    if new_savings < 0:
+        conn.close()
+        raise HTTPException(status_code=422, detail="Current savings cannot drop below zero")
+
+    if new_savings >= target_amount:
+        new_status = "Completed"
+    else:
+        new_status = "In Progress" if goal["status"] == "Completed" else goal["status"]
+
+    cursor.execute("""
+        UPDATE goals
+        SET current_savings = ?, status = ?
+        WHERE id = ? AND user_id = ?
+    """, (new_savings, new_status, goal_id, user_id))
+    conn.commit()
+
+    cursor.execute("SELECT * FROM goals WHERE id = ? AND user_id = ?", (goal_id, user_id))
+    updated_goal = dict(cursor.fetchone())
+    conn.close()
+
+    act = "DEPOSIT" if req.amount > 0 else "WITHDRAWAL"
+    record_audit_log(
+        user_role=role,
+        action_type=f"GOAL_{act}",
+        resource=f"GOAL#{goal_id}",
+        status="SUCCESS",
+        details=f"Goal #{goal_id} {act.lower()} of ${abs(req.amount):,.2f} (Savings: ${curr_savings:,.2f} -> ${new_savings:,.2f}, Status: {new_status})"
+    )
+
+    return updated_goal
 

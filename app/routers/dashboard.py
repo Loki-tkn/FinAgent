@@ -6,6 +6,7 @@ from app.database import get_db_connection
 from app.services.health_score import calculate_financial_health_score
 from app.services.metrics import monthly_avg_expense
 from app.security import get_current_role
+from app.services.assumptions import goal_assumptions
 from app.services.quant import (
     real_target,
     monte_carlo_goal,
@@ -23,6 +24,9 @@ def get_dashboard_summary(role: str = Depends(get_current_role)) -> Dict[str, An
     cash flow trend data, and quantitative analytics for the main dashboard.
     """
     user_id = 1
+    from app.services.recurring import materialize_recurring
+    materialize_recurring(user_id=user_id)
+
     conn = get_db_connection()
     cursor = conn.cursor()
 
@@ -50,11 +54,14 @@ def get_dashboard_summary(role: str = Depends(get_current_role)) -> Dict[str, An
     total_savings = goal_stats["total_saved"] or 0.0
     total_target = goal_stats["total_target"] or 0.0
 
-    cursor.execute("SELECT current_savings FROM goals WHERE user_id = ? AND (title LIKE '%Emergency%' OR title LIKE '%Safety%') LIMIT 1", (user_id,))
+    cursor.execute("SELECT current_savings FROM goals WHERE user_id = ? AND (LOWER(title) LIKE '%emergency%' OR LOWER(title) LIKE '%safety%') LIMIT 1", (user_id,))
     em_row = cursor.fetchone()
-    emergency_savings = em_row["current_savings"] if em_row else total_savings
+    emergency_savings = float(em_row["current_savings"]) if em_row and em_row["current_savings"] is not None else 0.0
 
-    # Monthly expense history (ALL expenses including anomalies)
+    now = datetime.now()
+    current_ym = now.strftime("%Y-%m")
+
+    # Monthly expense history (ALL expenses including anomalies, excl. summary)
     cursor.execute("""
         SELECT strftime('%Y-%m', date) as m, SUM(amount) as exp
         FROM transactions
@@ -62,7 +69,9 @@ def get_dashboard_summary(role: str = Depends(get_current_role)) -> Dict[str, An
         GROUP BY strftime('%Y-%m', date)
         ORDER BY m ASC
     """, (user_id,))
-    exp_history = [float(r["exp"]) for r in cursor.fetchall()]
+    exp_history_rows = cursor.fetchall()
+    completed_exp = [r for r in exp_history_rows if r["m"] < current_ym]
+    exp_history = [float(r["exp"]) for r in (completed_exp if len(completed_exp) >= 3 else exp_history_rows)]
 
     # Monthly net surplus history
     cursor.execute("""
@@ -73,7 +82,9 @@ def get_dashboard_summary(role: str = Depends(get_current_role)) -> Dict[str, An
         GROUP BY strftime('%Y-%m', date)
         ORDER BY m ASC
     """, (user_id,))
-    surplus_history = [float(r["net"]) for r in cursor.fetchall()]
+    surplus_rows = cursor.fetchall()
+    completed_surplus = [r for r in surplus_rows if r["m"] < current_ym]
+    surplus_history = [float(r["net"]) for r in (completed_surplus if len(completed_surplus) >= 3 else surplus_rows)]
 
     metrics = monthly_avg_expense(user_id=user_id, exclude_anomalies=True)
     essential_expense = metrics["essential"]
@@ -116,7 +127,8 @@ def get_dashboard_summary(role: str = Depends(get_current_role)) -> Dict[str, An
             "month": r["month"],
             "income": r["total_income"],
             "expense": r["total_expense"],
-            "net_savings": r["total_income"] - r["total_expense"]
+            "net_savings": r["total_income"] - r["total_expense"],
+            "partial": r["month"] == current_ym
         }
         for r in trend_rows
     ]
@@ -129,11 +141,32 @@ def get_dashboard_summary(role: str = Depends(get_current_role)) -> Dict[str, An
     """, (user_id,))
     goals = [dict(g) for g in cursor.fetchall()]
 
+    cursor.execute("SELECT COUNT(*) FROM transactions WHERE user_id = ?", (user_id,))
+    has_transactions = cursor.fetchone()[0] > 0
+
     cursor.execute("SELECT COUNT(*) FROM transactions WHERE user_id = ? AND is_anomaly = 1", (user_id,))
     anomaly_count = cursor.fetchone()[0]
 
     cursor.execute("SELECT COUNT(*) FROM sandbox_proposals WHERE user_id = ? AND status = 'PENDING'", (user_id,))
     pending_proposals_count = cursor.fetchone()[0]
+
+    cursor.execute("""
+        SELECT b.budget_limit, COALESCE(SUM(t.amount), 0.0) as spent
+        FROM monthly_budgets b
+        LEFT JOIN transactions t ON t.user_id = b.user_id
+                                 AND LOWER(t.category) = LOWER(b.category)
+                                 AND t.type = 'expense'
+                                 AND strftime('%Y-%m', t.date) = b.month_year
+        WHERE b.user_id = ? AND b.month_year = ?
+        GROUP BY b.id, b.budget_limit
+    """, (user_id, current_ym))
+    b_rows = cursor.fetchall()
+    budget_alerts = 0
+    for r in b_rows:
+        limit = float(r["budget_limit"])
+        spent = float(r["spent"])
+        if limit > 0 and (spent > limit or (spent / limit) >= 0.8):
+            budget_alerts += 1
 
     conn.close()
 
@@ -150,20 +183,18 @@ def get_dashboard_summary(role: str = Depends(get_current_role)) -> Dict[str, An
             cfar = round(base_exp * CFAR_FALLBACK_MULT, 2)
             em_need = round(emergency_target * cfar, 2)
 
-        # Primary Goal Success Prob
+        # Primary Goal = first In Progress goal
         goal_prob = None
-        if goals:
-            primary_goal = goals[0]
+        primary_goal = next((g for g in goals if g.get("status") == "In Progress"), goals[0] if goals else None)
+        if primary_goal:
             try:
                 g_target = float(primary_goal["target_amount"])
                 g_current = float(primary_goal["current_savings"])
                 g_contrib = float(primary_goal["monthly_contribution"]) if primary_goal.get("monthly_contribution") is not None else 0.0
                 g_dt = datetime.strptime(primary_goal["target_date"], "%Y-%m-%d")
-                now = datetime.now()
                 g_months = max(1, (g_dt.year - now.year) * 12 + (g_dt.month - now.month))
-                
-                g_ret = min(ann_return, 0.03) if ("Emergency" in primary_goal["title"] or g_months <= 12) else ann_return
-                g_vol = min(ann_vol, 0.03) if ("Emergency" in primary_goal["title"] or g_months <= 12) else ann_vol
+
+                g_ret, g_vol, _ = goal_assumptions(primary_goal["title"], g_months, {"expected_return": ann_return, "volatility": ann_vol, "inflation": ann_inf})
 
                 if is_low_data or len(surplus_history) < 2:
                     mean_surplus = monthly_surplus
@@ -182,7 +213,7 @@ def get_dashboard_summary(role: str = Depends(get_current_role)) -> Dict[str, An
 
                 adj_g_target = real_target(g_target, ann_inf, g_months)
                 mc = monte_carlo_goal(
-                    g_current, adj_g_target, g_months, [], g_ret, g_vol, n=2000,
+                    g_current, adj_g_target, g_months, [], g_ret, g_vol, n=10000,
                     custom_mean=dep_mean, custom_std=dep_std
                 )
                 goal_prob = mc["prob_success"]
@@ -204,6 +235,8 @@ def get_dashboard_summary(role: str = Depends(get_current_role)) -> Dict[str, An
         emergency_fund_savings=emergency_savings,
         emergency_target_months=emergency_target
     )
+    if not has_transactions:
+        health["provisional"] = True
 
     return {
         "user": {
@@ -226,7 +259,8 @@ def get_dashboard_summary(role: str = Depends(get_current_role)) -> Dict[str, An
             "total_savings_target": total_target,
             "overall_progress_pct": round((total_savings / total_target * 100.0), 1) if total_target > 0 else 0.0,
             "anomaly_count": anomaly_count,
-            "pending_proposals_count": pending_proposals_count
+            "pending_proposals_count": pending_proposals_count,
+            "budget_alerts": budget_alerts
         },
         "quant": quant_data,
         "health_score": health,

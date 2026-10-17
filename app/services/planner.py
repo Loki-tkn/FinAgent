@@ -1,8 +1,11 @@
+import math
 from datetime import datetime
-from typing import Dict, Any, List
+from typing import Dict, Any, List, Optional
 from app.database import get_db_connection
 from app.services.metrics import monthly_avg_expense
 from app.services.quant import required_monthly_payment, real_target
+from app.services.assumptions import goal_assumptions
+
 
 def calculate_months_between(target_date_str: str) -> int:
     """Calculates integer months remaining until target date."""
@@ -13,6 +16,25 @@ def calculate_months_between(target_date_str: str) -> int:
         return max(1, months)
     except Exception:
         return 12
+
+
+def _nper(pv: float, pmt: float, fv: float, r: float) -> Optional[float]:
+    """Months to reach fv from pv with monthly pmt and rate r."""
+    if fv <= pv:
+        return 0.0
+    if pmt <= 0:
+        return None
+    if abs(r) < 1e-9:
+        return (fv - pv) / pmt
+    a = pmt / r
+    if fv + a <= 0 or pv + a <= 0:
+        return None
+    try:
+        val = math.log((fv + a) / (pv + a)) / math.log(1.0 + r)
+        return max(0.0, val)
+    except Exception:
+        return None
+
 
 def generate_goal_plans(
     target_amount: float,
@@ -46,16 +68,20 @@ def generate_goal_plans(
         }
 
     months_remaining = calculate_months_between(target_date_str)
-    remaining_to_save = max(0.0, target_amount - current_savings)
 
     conn = get_db_connection()
     cursor = conn.cursor()
-    cursor.execute("SELECT expected_return, inflation FROM users WHERE id = ?", (user_id,))
+    cursor.execute("SELECT expected_return, volatility, inflation FROM users WHERE id = ?", (user_id,))
     u_row = cursor.fetchone()
     conn.close()
 
-    exp_return = float(u_row["expected_return"]) if u_row and u_row["expected_return"] is not None else 0.05
-    ann_inf = float(u_row["inflation"]) if u_row and u_row["inflation"] is not None else 0.03
+    profile = {
+        "expected_return": float(u_row["expected_return"]) if u_row and u_row["expected_return"] is not None else 0.05,
+        "volatility": float(u_row["volatility"]) if u_row and u_row["volatility"] is not None else 0.10,
+        "inflation": float(u_row["inflation"]) if u_row and u_row["inflation"] is not None else 0.03,
+    }
+
+    exp_return, _, ann_inf = goal_assumptions(goal_title, months_remaining, profile)
 
     adj_target = real_target(target_amount, ann_inf, months_remaining)
     required_monthly_savings = required_monthly_payment(adj_target, current_savings, months_remaining, exp_return)
@@ -66,6 +92,8 @@ def generate_goal_plans(
     is_low_data = metrics.get("low_data", False)
 
     current_monthly_surplus = monthly_income - total_monthly_expense
+    remaining_to_save = max(0.0, adj_target - current_savings)
+    r_monthly = exp_return / 12.0
 
     strategies = [
         {
@@ -101,12 +129,12 @@ def generate_goal_plans(
             if is_ess and cat not in essential_allowed:
                 continue
             cut_pct = strat["essential_cut"] if is_ess else strat["non_essential_cut"]
-            
+
             if cut_pct > 0 and curr_amt > 10:
                 saved_amt = round(curr_amt * cut_pct, 2)
                 rec_amt = round(curr_amt - saved_amt, 2)
                 total_cut += saved_amt
-                
+
                 if is_ess:
                     rationale = f"Optimize utility bills, negotiate subscriptions, and batch commute ({cut_pct*100:.0f}% savings)."
                 else:
@@ -122,11 +150,8 @@ def generate_goal_plans(
                 })
 
         new_monthly_surplus = current_monthly_surplus + total_cut
-        
-        if new_monthly_surplus > 0:
-            months_to_complete = round(remaining_to_save / new_monthly_surplus, 1)
-        else:
-            months_to_complete = None
+        mtc = _nper(current_savings, new_monthly_surplus, adj_target, r_monthly)
+        months_to_complete = round(mtc, 1) if mtc is not None else None
 
         gap = required_monthly_savings - new_monthly_surplus
         surplus_or_deficit = "Surplus" if gap <= 0 else "Deficit"
@@ -180,4 +205,3 @@ def generate_goal_plans(
         "needs_setup": False,
         "low_data": is_low_data
     }
-

@@ -76,6 +76,7 @@ def init_db(force_reseed: bool = False):
         is_essential BOOLEAN NOT NULL DEFAULT 1,
         is_anomaly BOOLEAN NOT NULL DEFAULT 0,
         anomaly_reason TEXT,
+        source TEXT NOT NULL DEFAULT 'manual',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY(user_id) REFERENCES users(id)
     );
@@ -131,6 +132,23 @@ def init_db(force_reseed: bool = False):
         month_year TEXT NOT NULL,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
+
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_monthly_budgets_unique
+        ON monthly_budgets(user_id, category, month_year);
+
+    CREATE TABLE IF NOT EXISTS recurring_rules (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL DEFAULT 1,
+        type TEXT NOT NULL,
+        category TEXT NOT NULL,
+        amount REAL NOT NULL,
+        description TEXT NOT NULL,
+        day_of_month INTEGER NOT NULL DEFAULT 1,
+        active INTEGER NOT NULL DEFAULT 1,
+        last_generated TEXT,
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+        FOREIGN KEY(user_id) REFERENCES users(id)
+    );
     """)
 
     # Idempotent migration for existing users table
@@ -157,6 +175,12 @@ def init_db(force_reseed: bool = False):
     if "initial_savings" not in goal_cols:
         cursor.execute("ALTER TABLE goals ADD COLUMN initial_savings REAL DEFAULT 0")
         cursor.execute("UPDATE goals SET initial_savings = current_savings WHERE initial_savings = 0")
+
+    # Idempotent migration for transactions.source
+    cursor.execute("PRAGMA table_info(transactions)")
+    tx_cols = {row["name"] for row in cursor.fetchall()}
+    if "source" not in tx_cols:
+        cursor.execute("ALTER TABLE transactions ADD COLUMN source TEXT NOT NULL DEFAULT 'manual'")
 
     # Ensure default categories exist
     for cat in DEFAULT_CATEGORIES:
@@ -190,7 +214,8 @@ def clear_user_data(conn):
     cursor.execute("DELETE FROM goals WHERE user_id = 1")
     cursor.execute("DELETE FROM sandbox_proposals WHERE user_id = 1")
     cursor.execute("DELETE FROM monthly_budgets WHERE user_id = 1")
-    cursor.execute("DELETE FROM sqlite_sequence WHERE name IN ('transactions','goals','sandbox_proposals','monthly_budgets')")
+    cursor.execute("DELETE FROM recurring_rules WHERE user_id = 1")
+    cursor.execute("DELETE FROM sqlite_sequence WHERE name IN ('transactions','goals','sandbox_proposals','monthly_budgets','recurring_rules')")
     
     cursor.execute("""
         UPDATE users

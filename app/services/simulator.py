@@ -76,15 +76,25 @@ def simulate_financial_decision(
         if goal_row and new_surplus > 0:
             new_remaining_goal = max(0.0, target_amount - new_savings)
             new_months = (new_remaining_goal / new_surplus) if new_remaining_goal > 0 else 0.0
-            delta_months = new_months - orig_months if orig_months is not None else 0.0
+            delta_months = (new_months - orig_months) if orig_months is not None else None
         else:
             new_months = None
             delta_months = None
-        
-        savings_ratio = (amount / current_savings) if current_savings > 0 else 0.0
-        if current_savings > 0 and savings_ratio > 0.5:
+
+        if not goal_row:
+            # No goal: assess by amount vs surplus
+            if orig_surplus > 0 and amount > 3.0 * orig_surplus:
+                impact_level = "SEVERE"
+                rec = f"High Risk: Spending ${amount:,.0f} is {amount/orig_surplus:.1f}x your monthly surplus (${orig_surplus:,.0f})."
+            elif orig_surplus > 0 and amount > orig_surplus:
+                impact_level = "MODERATE"
+                rec = f"Moderate Impact: ${amount:,.0f} exceeds your monthly surplus of ${orig_surplus:,.0f}."
+            else:
+                impact_level = "NEGLIGIBLE"
+                rec = f"Safe: Your cash flow absorbs this purchase comfortably."
+        elif current_savings > 0 and (amount / current_savings) > 0.5:
             impact_level = "SEVERE"
-            pct_str = f"{min(99.0, savings_ratio*100.0):.0f}%"
+            pct_str = f"{min(99.0, amount/current_savings*100.0):.0f}%"
             rec = f"High Risk: Spending ${amount:,.0f} consumes {pct_str} of your saved buffer" + (f" and delays '{goal_title}'." if goal_title else ".")
         elif delta_months is not None and delta_months > 1.5:
             impact_level = "MODERATE"
@@ -99,7 +109,7 @@ def simulate_financial_decision(
         if goal_row and new_surplus > 0:
             orig_remaining_goal = max(0.0, target_amount - current_savings)
             new_months = (orig_remaining_goal / new_surplus) if orig_remaining_goal > 0 else 0.0
-            delta_months = new_months - orig_months if orig_months is not None else 0.0
+            delta_months = (new_months - orig_months) if orig_months is not None else None
         else:
             new_months = None
             delta_months = None
@@ -120,7 +130,7 @@ def simulate_financial_decision(
         if goal_row and new_surplus > 0:
             orig_remaining_goal = max(0.0, target_amount - current_savings)
             new_months = (orig_remaining_goal / new_surplus) if orig_remaining_goal > 0 else 0.0
-            delta_months = new_months - orig_months if orig_months is not None else 0.0
+            delta_months = (new_months - orig_months) if orig_months is not None else None
         else:
             new_months = None
             delta_months = None

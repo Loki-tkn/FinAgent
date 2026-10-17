@@ -10,9 +10,11 @@ router = APIRouter(prefix="/api/admin", tags=["Admin & System"])
 def load_demo_data(role: str = Depends(require_role("Admin"))):
     """Clears existing user data and seeds 12 months USD demo dataset."""
     conn = get_db_connection()
-    clear_user_data(conn)
-    seed_demo_data(conn)
-    conn.close()
+    try:
+        clear_user_data(conn)
+        seed_demo_data(conn)
+    finally:
+        conn.close()
 
     record_audit_log(
         user_role=role,
@@ -32,8 +34,10 @@ def reset_demo_data(role: str = Depends(require_role("Admin"))):
 def clear_data(role: str = Depends(require_role("Admin"))):
     """Clears all user transactions, goals, and proposals, resetting to blank state."""
     conn = get_db_connection()
-    clear_user_data(conn)
-    conn.close()
+    try:
+        clear_user_data(conn)
+    finally:
+        conn.close()
 
     record_audit_log(
         user_role=role,
@@ -51,7 +55,7 @@ def get_system_status(role: str = Depends(require_role("Admin"))) -> Dict[str, A
     cursor = conn.cursor()
 
     counts = {}
-    for table in ["users", "transactions", "goals", "sandbox_proposals", "audit_logs", "categories"]:
+    for table in ["users", "transactions", "goals", "sandbox_proposals", "audit_logs", "categories", "monthly_budgets", "recurring_rules"]:
         try:
             cursor.execute(f"SELECT COUNT(*) FROM {table}")
             counts[table] = cursor.fetchone()[0]
