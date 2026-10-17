@@ -1,6 +1,8 @@
 from datetime import datetime
 from typing import Dict, Any, List
+from app.database import get_db_connection
 from app.services.metrics import monthly_avg_expense
+from app.services.quant import required_monthly_payment, real_target
 
 def calculate_months_between(target_date_str: str) -> int:
     """Calculates integer months remaining until target date."""
@@ -45,14 +47,25 @@ def generate_goal_plans(
 
     months_remaining = calculate_months_between(target_date_str)
     remaining_to_save = max(0.0, target_amount - current_savings)
-    required_monthly_savings = remaining_to_save / months_remaining if months_remaining > 0 else remaining_to_save
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT expected_return, inflation FROM users WHERE id = ?", (user_id,))
+    u_row = cursor.fetchone()
+    conn.close()
+
+    exp_return = float(u_row["expected_return"]) if u_row and u_row["expected_return"] is not None else 0.05
+    ann_inf = float(u_row["inflation"]) if u_row and u_row["inflation"] is not None else 0.03
+
+    adj_target = real_target(target_amount, ann_inf, months_remaining)
+    required_monthly_savings = required_monthly_payment(adj_target, current_savings, months_remaining, exp_return)
 
     metrics = monthly_avg_expense(user_id=user_id, exclude_anomalies=True)
     cat_expenses = metrics["by_category"]
     total_monthly_expense = metrics["total"]
     is_low_data = metrics.get("low_data", False)
 
-    current_monthly_surplus = max(0.0, monthly_income - total_monthly_expense)
+    current_monthly_surplus = monthly_income - total_monthly_expense
 
     strategies = [
         {
@@ -75,6 +88,7 @@ def generate_goal_plans(
         }
     ]
 
+    essential_allowed = {"Utilities & Bills", "Transportation & Fuel"}
     plans: List[Dict[str, Any]] = []
 
     for strat in strategies:
@@ -84,6 +98,8 @@ def generate_goal_plans(
         for cat, data in cat_expenses.items():
             curr_amt = data["monthly_amount"]
             is_ess = data["is_essential"]
+            if is_ess and cat not in essential_allowed:
+                continue
             cut_pct = strat["essential_cut"] if is_ess else strat["non_essential_cut"]
             
             if cut_pct > 0 and curr_amt > 10:
@@ -110,7 +126,7 @@ def generate_goal_plans(
         if new_monthly_surplus > 0:
             months_to_complete = round(remaining_to_save / new_monthly_surplus, 1)
         else:
-            months_to_complete = 999.0
+            months_to_complete = None
 
         gap = required_monthly_savings - new_monthly_surplus
         surplus_or_deficit = "Surplus" if gap <= 0 else "Deficit"
@@ -124,10 +140,12 @@ def generate_goal_plans(
         else:
             feasibility = "Extreme"
 
-        ai_rec = (
-            f"Under the {strat['name']} plan, you save ${new_monthly_surplus:,.0f}/month. "
-            f"{'You will reach your goal ' + str(round(months_remaining - months_to_complete, 1)) + ' months earlier than deadline!' if months_to_complete < months_remaining else 'You achieve target in ' + str(months_to_complete) + ' months.'}"
-        )
+        if months_to_complete is None:
+            ai_rec = f"Under the {strat['name']} plan, monthly surplus is ${new_monthly_surplus:,.0f} (insufficient to accumulate savings)."
+        elif months_to_complete < months_remaining:
+            ai_rec = f"Under the {strat['name']} plan, you save ${new_monthly_surplus:,.0f}/month. You will reach your goal {round(months_remaining - months_to_complete, 1)} months earlier than deadline!"
+        else:
+            ai_rec = f"Under the {strat['name']} plan, you save ${new_monthly_surplus:,.0f}/month. You achieve target in {months_to_complete} months."
 
         plans.append({
             "plan_name": strat["name"],
@@ -162,3 +180,4 @@ def generate_goal_plans(
         "needs_setup": False,
         "low_data": is_low_data
     }
+

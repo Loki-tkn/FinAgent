@@ -1,10 +1,10 @@
+import numpy as np
 from fastapi import APIRouter, Depends, HTTPException, Query
 from typing import Optional, Dict, Any
 from datetime import datetime
 from app.database import get_db_connection
 from app.schemas import MonteCarloGoalResponse, ForecastResponse, LoanVsCashRequest, LoanVsCashResponse
 from app.security import get_current_role
-from app.services.metrics import monthly_avg_expense
 from app.services.audit import record_audit_log
 from app.services.quant import (
     required_monthly_payment,
@@ -13,7 +13,8 @@ from app.services.quant import (
     monte_carlo_goal,
     cash_flow_at_risk,
     emergency_fund_needed,
-    loan_vs_cash
+    loan_vs_cash,
+    CFAR_FALLBACK_MULT
 )
 
 router = APIRouter(prefix="/api/quant", tags=["Quantitative Analytics"])
@@ -29,7 +30,7 @@ def get_user_profile(user_id: int = 1) -> Dict[str, Any]:
 @router.get("/goal/{goal_id}/monte-carlo", response_model=MonteCarloGoalResponse)
 def get_goal_monte_carlo(
     goal_id: int,
-    ret: Optional[float] = Query(default=None, ge=0.0, le=1.0, alias="return"),
+    ret: Optional[float] = Query(default=None, ge=-0.5, le=1.0, alias="return"),
     vol: Optional[float] = Query(default=None, ge=0.0, le=1.0),
     inf: Optional[float] = Query(default=None, ge=0.0, le=1.0, alias="inflation"),
     role: str = Depends(get_current_role)
@@ -54,6 +55,12 @@ def get_goal_monte_carlo(
         ORDER BY m ASC
     """, (user_id,))
     history_rows = cursor.fetchall()
+    
+    # Extract total expense history months count for low_data check
+    cursor.execute("""
+        SELECT COUNT(DISTINCT strftime('%Y-%m', date)) FROM transactions WHERE user_id = ? AND type = 'expense'
+    """, (user_id,))
+    exp_months_count = cursor.fetchone()[0]
     conn.close()
 
     if not goal:
@@ -61,6 +68,7 @@ def get_goal_monte_carlo(
 
     target_amount = float(goal["target_amount"])
     current_savings = float(goal["current_savings"])
+    contrib = float(goal["monthly_contribution"]) if goal["monthly_contribution"] is not None else 0.0
     
     # Calculate months remaining
     try:
@@ -70,12 +78,20 @@ def get_goal_monte_carlo(
     except Exception:
         months_remaining = 12
 
-    ann_return = ret if ret is not None else float(prof.get("expected_return", 0.05))
-    ann_vol = vol if vol is not None else float(prof.get("volatility", 0.10))
+    prof_return = float(prof.get("expected_return", 0.05))
+    prof_vol = float(prof.get("volatility", 0.10))
+    if "Emergency" in goal["title"] or months_remaining <= 12:
+        default_return = min(prof_return, 0.03)
+        default_vol = min(prof_vol, 0.03)
+    else:
+        default_return = prof_return
+        default_vol = prof_vol
+
+    ann_return = ret if ret is not None else default_return
+    ann_vol = vol if vol is not None else default_vol
     ann_inf = inf if inf is not None else float(prof.get("inflation", 0.03))
 
-    metrics = monthly_avg_expense(user_id=user_id, exclude_anomalies=True)
-    is_low_data = metrics.get("low_data", False)
+    is_low_data = (exp_months_count < 3)
 
     if monthly_income <= 0:
         return {
@@ -98,23 +114,34 @@ def get_goal_monte_carlo(
             "low_data": False
         }
 
-    # Surplus history: if low_data use declared surplus with 15% std
     if is_low_data or len(history_rows) < 2:
         est_exp = float(prof.get("est_monthly_expense", 0.0))
         mean_surplus = max(0.0, monthly_income - est_exp)
-        surplus_history = [mean_surplus]
+        hist_std = 0.15 * mean_surplus
     else:
-        surplus_history = [float(r["net"]) for r in history_rows]
+        surplus_list = [float(r["net"]) for r in history_rows]
+        mean_surplus = float(np.mean(surplus_list))
+        hist_std = float(np.std(surplus_list, ddof=1)) if len(surplus_list) > 1 else 0.15 * mean_surplus
+
+    if contrib > 0:
+        dep_mean = contrib
+        scale = min(1.0, contrib / mean_surplus) if mean_surplus > 0 else 1.0
+        dep_std = max(hist_std * scale, 0.10 * contrib)
+    else:
+        dep_mean = max(0.0, mean_surplus)
+        dep_std = max(10.0, hist_std)
 
     adj_target = real_target(target_amount, ann_inf, months_remaining)
     mc_res = monte_carlo_goal(
         current=current_savings,
         target=adj_target,
         months=months_remaining,
-        monthly_surplus_history=surplus_history,
+        monthly_surplus_history=[],
         annual_return=ann_return,
         annual_vol=ann_vol,
-        n=10000
+        n=10000,
+        custom_mean=dep_mean,
+        custom_std=dep_std
     )
     pmt = required_monthly_payment(adj_target, current_savings, months_remaining, ann_return)
 
@@ -159,7 +186,7 @@ def get_expense_forecast(role: str = Depends(get_current_role)):
     cursor.execute("""
         SELECT strftime('%Y-%m', date) as m, SUM(amount) as exp
         FROM transactions
-        WHERE user_id = ? AND type = 'expense' AND is_anomaly = 0
+        WHERE user_id = ? AND type = 'expense'
         GROUP BY strftime('%Y-%m', date)
         ORDER BY m ASC
     """, (user_id,))
@@ -168,7 +195,6 @@ def get_expense_forecast(role: str = Depends(get_current_role)):
 
     series = [float(r["exp"]) for r in rows]
     num_hist = len(series)
-    metrics = monthly_avg_expense(user_id=user_id, exclude_anomalies=True)
     is_low_data = (num_hist < 3)
 
     if monthly_income <= 0:
@@ -191,7 +217,7 @@ def get_expense_forecast(role: str = Depends(get_current_role)):
         forecast = est_exp
         lower = max(0.0, est_exp * 0.70)
         upper = est_exp * 1.30
-        cfar = est_exp * 1.25
+        cfar = est_exp * CFAR_FALLBACK_MULT
         em_needed = emergency_months * cfar
     else:
         forecast, lower, upper = ewma_forecast(series, alpha=0.3)
@@ -217,6 +243,7 @@ def get_expense_forecast(role: str = Depends(get_current_role)):
         "needs_setup": False,
         "low_data": is_low_data
     }
+
 
 @router.post("/loan-vs-cash", response_model=LoanVsCashResponse)
 def evaluate_loan_vs_cash(

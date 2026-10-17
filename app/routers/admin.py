@@ -63,7 +63,7 @@ def get_system_status(role: str = Depends(require_role("Admin"))) -> Dict[str, A
     return {
         "status": "ONLINE",
         "mode": "FINTECHATHON_SIMULATION_SANDBOX",
-        "ai_engine": "Rule-Based Deterministic & Statistical Z-Score Engine",
+        "ai_engine": "Robust statistics (median/MAD) + Monte Carlo",
         "table_records": counts,
         "environment": "Local FastAPI + SQLite",
         "external_api_dependencies": None

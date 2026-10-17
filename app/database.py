@@ -27,6 +27,13 @@ def get_db_connection():
     conn.execute("PRAGMA foreign_keys = ON;")
     return conn
 
+def add_months(dt, months):
+    month = dt.month - 1 + months
+    year = dt.year + month // 12
+    month = month % 12 + 1
+    max_days = [31, 29 if year % 4 == 0 and (year % 100 != 0 or year % 400 == 0) else 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31][month - 1]
+    return dt.replace(year=year, month=month, day=min(dt.day, max_days))
+
 def init_db(force_reseed: bool = False):
     """Initializes the database schema and performs idempotent migrations."""
     conn = get_db_connection()
@@ -79,6 +86,7 @@ def init_db(force_reseed: bool = False):
         title TEXT NOT NULL,
         target_amount REAL NOT NULL,
         current_savings REAL NOT NULL DEFAULT 0,
+        initial_savings REAL NOT NULL DEFAULT 0,
         monthly_contribution REAL NOT NULL DEFAULT 0,
         target_date TEXT NOT NULL,
         selected_plan TEXT DEFAULT 'Balanced',
@@ -143,6 +151,13 @@ def init_db(force_reseed: bool = False):
         if col_name not in existing_cols:
             cursor.execute(f"ALTER TABLE users ADD COLUMN {col_name} {col_def}")
 
+    # Idempotent migration for goals.initial_savings
+    cursor.execute("PRAGMA table_info(goals)")
+    goal_cols = {row["name"] for row in cursor.fetchall()}
+    if "initial_savings" not in goal_cols:
+        cursor.execute("ALTER TABLE goals ADD COLUMN initial_savings REAL DEFAULT 0")
+        cursor.execute("UPDATE goals SET initial_savings = current_savings WHERE initial_savings = 0")
+
     # Ensure default categories exist
     for cat in DEFAULT_CATEGORIES:
         cursor.execute("INSERT OR IGNORE INTO categories (name, type, is_essential, icon) VALUES (?, ?, ?, ?)", cat)
@@ -157,9 +172,14 @@ def init_db(force_reseed: bool = False):
 
     conn.commit()
 
-    if force_reseed or os.getenv("SEED_DEMO") == "1":
+    if force_reseed:
         clear_user_data(conn)
         seed_demo_data(conn)
+    elif os.getenv("SEED_DEMO") == "1":
+        cursor.execute("SELECT COUNT(*) FROM transactions")
+        if cursor.fetchone()[0] == 0:
+            clear_user_data(conn)
+            seed_demo_data(conn)
 
     conn.close()
 
@@ -170,6 +190,7 @@ def clear_user_data(conn):
     cursor.execute("DELETE FROM goals WHERE user_id = 1")
     cursor.execute("DELETE FROM sandbox_proposals WHERE user_id = 1")
     cursor.execute("DELETE FROM monthly_budgets WHERE user_id = 1")
+    cursor.execute("DELETE FROM sqlite_sequence WHERE name IN ('transactions','goals','sandbox_proposals','monthly_budgets')")
     
     cursor.execute("""
         UPDATE users
@@ -196,84 +217,102 @@ def seed_demo_data(conn):
         WHERE id = 1
     """)
 
-    # Generate 12 months history
     base_date = datetime.now()
+
+    # 1. Insert Goals first
+    target_dt1 = add_months(base_date, 12).strftime("%Y-%m-%d")
+    target_dt2 = add_months(base_date, 8).strftime("%Y-%m-%d")
+    cursor.execute("""
+        INSERT INTO goals (user_id, title, target_amount, current_savings, initial_savings, monthly_contribution, target_date, selected_plan, status, notes)
+        VALUES (1, 'Emergency Fund (6 Months Expenses)', 18000, 6500, 6500, 800, ?, 'Balanced', 'In Progress', 'High priority safety net for unexpected healthcare or career transitions.')
+    """, (target_dt1,))
+    first_goal_id = cursor.lastrowid
+
+    cursor.execute("""
+        INSERT INTO goals (user_id, title, target_amount, current_savings, initial_savings, monthly_contribution, target_date, selected_plan, status, notes)
+        VALUES (1, 'Japan Autumn Travel Trip 2027', 4000, 1200, 1200, 400, ?, 'Conservative', 'In Progress', 'Flight tickets, hotel accommodation in Tokyo & Kyoto.')
+    """, (target_dt2,))
+
+    # 2. Generate transactions
     transactions = []
+    today_str = base_date.strftime("%Y-%m-%d")
 
     for m in range(12, 0, -1):
-        month_offset_days = (m - 1) * 30
-        ref_date = base_date - timedelta(days=month_offset_days)
+        ref_date = add_months(base_date, -m + 1)
+        if ref_date > base_date:
+            continue
         
-        salary_date = (ref_date.replace(day=1)).strftime("%Y-%m-%d")
-        transactions.append((1, 'Salary', 4200.0, 'income', 'Primary Monthly Salary', salary_date, 1, 0, None))
+        salary_date = ref_date.replace(day=1).strftime("%Y-%m-%d")
+        if salary_date <= today_str:
+            transactions.append((1, 'Salary', 4200.0, 'income', 'Primary Monthly Salary', salary_date, 1, 0, None))
 
-        freelance_day = min(15, (base_date - timedelta(days=month_offset_days)).day)
-        freelance_date = (ref_date.replace(day=max(1, freelance_day))).strftime("%Y-%m-%d")
-        if datetime.strptime(freelance_date, "%Y-%m-%d") > base_date:
-            freelance_date = base_date.strftime("%Y-%m-%d")
-        transactions.append((1, 'Freelance / Bonus', 800.0, 'income', 'Consulting & Freelance Work', freelance_date, 1, 0, None))
+        freelance_date = ref_date.replace(day=min(15, ref_date.day)).strftime("%Y-%m-%d")
+        if freelance_date <= today_str:
+            transactions.append((1, 'Freelance / Bonus', 800.0, 'income', 'Consulting & Freelance Work', freelance_date, 1, 0, None))
 
-        rent_date = (ref_date.replace(day=2)).strftime("%Y-%m-%d")
-        transactions.append((1, 'Rent & Housing', 1400.0, 'expense', 'Monthly Apartment Rent', rent_date, 1, 0, None))
+        rent_date = ref_date.replace(day=2).strftime("%Y-%m-%d")
+        if rent_date <= today_str:
+            transactions.append((1, 'Rent & Housing', 1400.0, 'expense', 'Monthly Apartment Rent', rent_date, 1, 0, None))
 
         util_amt = round(160.0 * (1 + rng.uniform(-0.10, 0.10)), 2)
-        util_date = (ref_date.replace(day=6)).strftime("%Y-%m-%d")
-        transactions.append((1, 'Utilities & Bills', util_amt, 'expense', 'Electricity, Water & Internet', util_date, 1, 0, None))
+        util_date = ref_date.replace(day=6).strftime("%Y-%m-%d")
+        if util_date <= today_str:
+            transactions.append((1, 'Utilities & Bills', util_amt, 'expense', 'Electricity, Water & Internet', util_date, 1, 0, None))
 
         trans_amt = round(120.0 * (1 + rng.uniform(-0.10, 0.10)), 2)
-        trans_date = (ref_date.replace(day=12)).strftime("%Y-%m-%d")
-        transactions.append((1, 'Transportation & Fuel', trans_amt, 'expense', 'Metro Pass & Fuel', trans_date, 1, 0, None))
+        trans_date = ref_date.replace(day=12).strftime("%Y-%m-%d")
+        if trans_date <= today_str:
+            transactions.append((1, 'Transportation & Fuel', trans_amt, 'expense', 'Metro Pass & Fuel', trans_date, 1, 0, None))
 
-        gym_date = (ref_date.replace(day=3)).strftime("%Y-%m-%d")
-        transactions.append((1, 'Health & Fitness', 40.0, 'expense', 'Gym Membership', gym_date, 1, 0, None))
-        sub_date = (ref_date.replace(day=8)).strftime("%Y-%m-%d")
-        transactions.append((1, 'Online Subscriptions', 25.0, 'expense', 'Streaming & Music Services', sub_date, 0, 0, None))
+        gym_date = ref_date.replace(day=3).strftime("%Y-%m-%d")
+        if gym_date <= today_str:
+            transactions.append((1, 'Health & Fitness', 40.0, 'expense', 'Gym Membership', gym_date, 1, 0, None))
+        sub_date = ref_date.replace(day=8).strftime("%Y-%m-%d")
+        if sub_date <= today_str:
+            transactions.append((1, 'Online Subscriptions', 25.0, 'expense', 'Streaming & Music Services', sub_date, 0, 0, None))
 
         for week in range(4):
             day_num = min(28, 4 + week * 7)
-            g_date = (ref_date.replace(day=day_num)).strftime("%Y-%m-%d")
-            g_amt = round(200.0 * (1 + rng.uniform(-0.10, 0.10)), 2)
-            transactions.append((1, 'Groceries & Food', g_amt, 'expense', f'Weekly Grocery Restock (Week {week+1})', g_date, 1, 0, None))
+            g_date = ref_date.replace(day=day_num).strftime("%Y-%m-%d")
+            if g_date <= today_str:
+                g_amt = round(200.0 * (1 + rng.uniform(-0.10, 0.10)), 2)
+                transactions.append((1, 'Groceries & Food', g_amt, 'expense', f'Weekly Grocery Restock (Week {week+1})', g_date, 1, 0, None))
 
         for d_idx in range(rng.randint(2, 3)):
             d_day = min(28, 7 + d_idx * 9)
-            d_date = (ref_date.replace(day=d_day)).strftime("%Y-%m-%d")
-            d_amt = round(rng.uniform(60.0, 90.0), 2)
-            transactions.append((1, 'Dining & Cafes', d_amt, 'expense', 'Restaurant & Coffee', d_date, 0, 0, None))
+            d_date = ref_date.replace(day=d_day).strftime("%Y-%m-%d")
+            if d_date <= today_str:
+                d_amt = round(rng.uniform(60.0, 90.0), 2)
+                transactions.append((1, 'Dining & Cafes', d_amt, 'expense', 'Restaurant & Coffee', d_date, 0, 0, None))
 
         ent_day = min(28, 14)
-        ent_date = (ref_date.replace(day=ent_day)).strftime("%Y-%m-%d")
-        ent_amt = round(rng.uniform(70.0, 120.0), 2)
-        transactions.append((1, 'Entertainment & Leisure', ent_amt, 'expense', 'Cinema & Weekend Activities', ent_date, 0, 0, None))
+        ent_date = ref_date.replace(day=ent_day).strftime("%Y-%m-%d")
+        if ent_date <= today_str:
+            ent_amt = round(rng.uniform(70.0, 120.0), 2)
+            transactions.append((1, 'Entertainment & Leisure', ent_amt, 'expense', 'Cinema & Weekend Activities', ent_date, 0, 0, None))
 
         shop_day = min(28, 18)
-        shop_date = (ref_date.replace(day=shop_day)).strftime("%Y-%m-%d")
-        shop_amt = round(rng.uniform(60.0, 110.0), 2)
-        transactions.append((1, 'Shopping & Gadgets', shop_amt, 'expense', 'Clothing & Household Supplies', shop_date, 0, 0, None))
+        shop_date = ref_date.replace(day=shop_day).strftime("%Y-%m-%d")
+        if shop_date <= today_str:
+            shop_amt = round(rng.uniform(60.0, 110.0), 2)
+            transactions.append((1, 'Shopping & Gadgets', shop_amt, 'expense', 'Clothing & Household Supplies', shop_date, 0, 0, None))
 
-    # 2 Anomalies in latest month
+    # 2 High-value transactions for anomaly detection
     ipad_date = (base_date - timedelta(days=12)).strftime("%Y-%m-%d")
-    transactions.append((1, 'Shopping & Gadgets', 1200.0, 'expense', 'Apple iPad Air M2 (Impulse Purchase)', ipad_date, 0, 1, 'Z-Score: +3.85 | Single expense $1,200 is 10x higher than typical category average'))
+    if ipad_date <= today_str:
+        transactions.append((1, 'Shopping & Gadgets', 1200.0, 'expense', 'Apple iPad Air M2 (Impulse Purchase)', ipad_date, 0, 0, None))
     
     party_date = (base_date - timedelta(days=5)).strftime("%Y-%m-%d")
-    transactions.append((1, 'Dining & Cafes', 350.0, 'expense', 'Rooftop VIP Lounge Party', party_date, 0, 1, 'Z-Score: +2.95 | Single dining bill exceeds 4.5x typical restaurant expense'))
+    if party_date <= today_str:
+        transactions.append((1, 'Dining & Cafes', 350.0, 'expense', 'Rooftop VIP Lounge Party', party_date, 0, 0, None))
 
     cursor.executemany("""
         INSERT INTO transactions (user_id, category, amount, type, description, date, is_essential, is_anomaly, anomaly_reason)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, transactions)
 
-    target_dt1 = (base_date + timedelta(days=365)).strftime("%Y-%m-%d")
-    target_dt2 = (base_date + timedelta(days=240)).strftime("%Y-%m-%d")
-    cursor.execute("""
-        INSERT INTO goals (user_id, title, target_amount, current_savings, monthly_contribution, target_date, selected_plan, status, notes)
-        VALUES 
-        (1, 'Emergency Fund (6 Months Expenses)', 18000, 6500, 800, ?, 'Balanced', 'In Progress', 'High priority safety net for unexpected healthcare or career transitions.'),
-        (1, 'Japan Autumn Travel Trip 2027', 4000, 1200, 400, ?, 'Conservative', 'In Progress', 'Flight tickets, hotel accommodation in Tokyo & Kyoto.')
-    """, (target_dt1, target_dt2))
-
     proposal_payload = json.dumps({
-        "goal_id": 1,
+        "goal_id": first_goal_id,
         "category_adjustments": {
             "Dining & Cafes": {"current": 450, "proposed": 200, "delta": -250},
             "Shopping & Gadgets": {"current": 400, "proposed": 100, "delta": -300},
@@ -298,3 +337,8 @@ def seed_demo_data(conn):
     """)
 
     conn.commit()
+
+    # Call detect_spending_anomalies via local import
+    from app.services.anomaly import detect_spending_anomalies
+    detect_spending_anomalies(user_id=1, threshold_z=3.5)
+

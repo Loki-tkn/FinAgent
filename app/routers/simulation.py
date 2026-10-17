@@ -29,7 +29,7 @@ def run_simulation(
         action_type="SIMULATION_RUN",
         resource="SIMULATOR",
         status="SUCCESS",
-        details=f"Ran {req.scenario_type} simulation of {req.amount:,.0f} ₫. Impact: {result['impact_level']} (Delta: {result['delay_or_advance_months']} mo)"
+        details=f"Ran {req.scenario_type} simulation of ${req.amount:,.0f}. Impact: {result['impact_level']} (Delta: {result['delay_or_advance_months']} mo)"
     )
 
     return result

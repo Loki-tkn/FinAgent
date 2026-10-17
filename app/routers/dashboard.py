@@ -1,3 +1,4 @@
+import numpy as np
 from fastapi import APIRouter, Depends
 from typing import Dict, Any, Optional
 from datetime import datetime
@@ -9,7 +10,8 @@ from app.services.quant import (
     real_target,
     monte_carlo_goal,
     cash_flow_at_risk,
-    emergency_fund_needed
+    emergency_fund_needed,
+    CFAR_FALLBACK_MULT
 )
 
 router = APIRouter(prefix="/api/dashboard", tags=["Dashboard"])
@@ -52,11 +54,11 @@ def get_dashboard_summary(role: str = Depends(get_current_role)) -> Dict[str, An
     em_row = cursor.fetchone()
     emergency_savings = em_row["current_savings"] if em_row else total_savings
 
-    # Monthly expense history
+    # Monthly expense history (ALL expenses including anomalies)
     cursor.execute("""
         SELECT strftime('%Y-%m', date) as m, SUM(amount) as exp
         FROM transactions
-        WHERE user_id = ? AND type = 'expense' AND is_anomaly = 0
+        WHERE user_id = ? AND type = 'expense'
         GROUP BY strftime('%Y-%m', date)
         ORDER BY m ASC
     """, (user_id,))
@@ -79,7 +81,7 @@ def get_dashboard_summary(role: str = Depends(get_current_role)) -> Dict[str, An
     total_monthly_expense = metrics["total"]
     is_low_data = metrics.get("low_data", False)
 
-    monthly_surplus = max(0.0, monthly_income - total_monthly_expense)
+    monthly_surplus = monthly_income - total_monthly_expense
     savings_rate = (monthly_surplus / monthly_income * 100.0) if monthly_income > 0 else 0.0
 
     cursor.execute("""
@@ -140,13 +142,12 @@ def get_dashboard_summary(role: str = Depends(get_current_role)) -> Dict[str, An
     # Compute Quant Summary for Primary Goal
     quant_data = None
     if not needs_setup:
-        # Emergency Fund & CFaR
         if len(exp_history) >= 3:
             cfar = cash_flow_at_risk(exp_history, conf=0.95)
             em_need = emergency_fund_needed(exp_history, conf=0.95, months_cover=emergency_target)
         else:
             base_exp = est_monthly_exp if est_monthly_exp > 0 else (exp_history[-1] if exp_history else total_monthly_expense)
-            cfar = round(base_exp * 1.20, 2)
+            cfar = round(base_exp * CFAR_FALLBACK_MULT, 2)
             em_need = round(emergency_target * cfar, 2)
 
         # Primary Goal Success Prob
@@ -156,16 +157,37 @@ def get_dashboard_summary(role: str = Depends(get_current_role)) -> Dict[str, An
             try:
                 g_target = float(primary_goal["target_amount"])
                 g_current = float(primary_goal["current_savings"])
+                g_contrib = float(primary_goal["monthly_contribution"]) if primary_goal.get("monthly_contribution") is not None else 0.0
                 g_dt = datetime.strptime(primary_goal["target_date"], "%Y-%m-%d")
                 now = datetime.now()
                 g_months = max(1, (g_dt.year - now.year) * 12 + (g_dt.month - now.month))
                 
-                s_hist = surplus_history if (len(surplus_history) >= 2 and not is_low_data) else [monthly_surplus]
+                g_ret = min(ann_return, 0.03) if ("Emergency" in primary_goal["title"] or g_months <= 12) else ann_return
+                g_vol = min(ann_vol, 0.03) if ("Emergency" in primary_goal["title"] or g_months <= 12) else ann_vol
+
+                if is_low_data or len(surplus_history) < 2:
+                    mean_surplus = monthly_surplus
+                    hist_std = 0.15 * mean_surplus if mean_surplus > 0 else 100.0
+                else:
+                    mean_surplus = float(np.mean(surplus_history))
+                    hist_std = float(np.std(surplus_history, ddof=1)) if len(surplus_history) > 1 else 0.15 * mean_surplus
+
+                if g_contrib > 0:
+                    dep_mean = g_contrib
+                    scale = min(1.0, g_contrib / mean_surplus) if mean_surplus > 0 else 1.0
+                    dep_std = max(hist_std * scale, 0.10 * g_contrib)
+                else:
+                    dep_mean = max(0.0, mean_surplus)
+                    dep_std = max(10.0, hist_std)
+
                 adj_g_target = real_target(g_target, ann_inf, g_months)
-                mc = monte_carlo_goal(g_current, adj_g_target, g_months, s_hist, ann_return, ann_vol, n=2000)
+                mc = monte_carlo_goal(
+                    g_current, adj_g_target, g_months, [], g_ret, g_vol, n=2000,
+                    custom_mean=dep_mean, custom_std=dep_std
+                )
                 goal_prob = mc["prob_success"]
             except Exception:
-                goal_prob = 0.5
+                goal_prob = None
 
         quant_data = {
             "goal_success_prob": goal_prob,
@@ -212,3 +234,4 @@ def get_dashboard_summary(role: str = Depends(get_current_role)) -> Dict[str, An
         "cash_flow_trends": cash_flow_trends,
         "goals": goals
     }
+

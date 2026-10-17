@@ -10,7 +10,7 @@ def track_goal_progress(goal_id: int, user_id: int = 1) -> Dict[str, Any]:
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("""
-        SELECT id, title, target_amount, current_savings, monthly_contribution, target_date, created_at, selected_plan, status
+        SELECT id, title, target_amount, current_savings, initial_savings, monthly_contribution, target_date, created_at, selected_plan, status
         FROM goals
         WHERE id = ? AND user_id = ?
     """, (goal_id, user_id))
@@ -22,6 +22,7 @@ def track_goal_progress(goal_id: int, user_id: int = 1) -> Dict[str, Any]:
 
     target_amount = float(goal["target_amount"])
     current_savings = float(goal["current_savings"])
+    initial_savings = float(goal["initial_savings"]) if "initial_savings" in goal.keys() and goal["initial_savings"] is not None else current_savings
     completion_pct = min(100.0, (current_savings / target_amount * 100.0)) if target_amount > 0 else 0.0
 
     now = datetime.now()
@@ -39,7 +40,8 @@ def track_goal_progress(goal_id: int, user_id: int = 1) -> Dict[str, Any]:
     months_elapsed = max(0, (now.year - created_dt.year) * 12 + (now.month - created_dt.month))
     months_remaining = max(1, (target_dt.year - now.year) * 12 + (target_dt.month - now.month))
 
-    expected_savings_to_date = min(target_amount, (target_amount / total_months) * (months_elapsed + 1))
+    expected_savings_to_date = min(target_amount, initial_savings + ((target_amount - initial_savings) / total_months) * months_elapsed)
+
     gap = current_savings - expected_savings_to_date
 
     remaining_amount = max(0.0, target_amount - current_savings)

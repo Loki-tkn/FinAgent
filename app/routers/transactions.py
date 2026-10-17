@@ -63,14 +63,18 @@ def add_custom_category(
     cursor.execute("SELECT id FROM categories WHERE LOWER(name) = LOWER(?) AND type = ?", (cat.name.strip(), cat.type))
     if cursor.fetchone():
         conn.close()
-        raise HTTPException(status_code=400, detail=f"Category '{cat.name}' of type '{cat.type}' already exists.")
+        raise HTTPException(status_code=409, detail=f"Category '{cat.name}' of type '{cat.type}' already exists.")
 
-    cursor.execute("""
-        INSERT INTO categories (name, type, is_essential, icon)
-        VALUES (?, ?, ?, 'tag')
-    """, (cat.name.strip(), cat.type, 1 if cat.is_essential else 0))
-    cat_id = cursor.lastrowid
-    conn.commit()
+    try:
+        cursor.execute("""
+            INSERT INTO categories (name, type, is_essential, icon)
+            VALUES (?, ?, ?, 'tag')
+        """, (cat.name.strip(), cat.type, 1 if cat.is_essential else 0))
+        cat_id = cursor.lastrowid
+        conn.commit()
+    except Exception as e:
+        conn.close()
+        raise HTTPException(status_code=409, detail="Category already exists.")
     conn.close()
 
     record_audit_log(
@@ -92,12 +96,21 @@ def add_transaction(
     Adds a new transaction. Validates category exists in categories table.
     Derives is_essential from category row (ignores client input).
     """
+    try:
+        from datetime import date as dt_date
+        dt_date.fromisoformat(tx.date)
+    except ValueError:
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail="Invalid date format. Expected YYYY-MM-DD."
+        )
+
     user_id = 1
     conn = get_db_connection()
     cursor = conn.cursor()
 
-    # Validate category exists
-    cursor.execute("SELECT is_essential, type FROM categories WHERE LOWER(name) = LOWER(?)", (tx.category.strip(),))
+    # Validate category exists & case-insensitive lookup
+    cursor.execute("SELECT name, is_essential, type FROM categories WHERE LOWER(name) = LOWER(?)", (tx.category.strip(),))
     cat_row = cursor.fetchone()
     if not cat_row:
         conn.close()
@@ -106,24 +119,32 @@ def add_transaction(
             detail=f"Category '{tx.category}' does not exist. Please select or create a valid category."
         )
 
+    if cat_row["type"] != tx.type:
+        conn.close()
+        raise HTTPException(
+            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            detail=f"Category type '{cat_row['type']}' does not match transaction type '{tx.type}'."
+        )
+
+    canonical_cat_name = cat_row["name"]
     derived_is_essential = bool(cat_row["is_essential"])
 
     cursor.execute("""
         INSERT INTO transactions (user_id, category, amount, type, description, date, is_essential)
         VALUES (?, ?, ?, ?, ?, ?, ?)
-    """, (user_id, tx.category, tx.amount, tx.type, tx.description, tx.date, int(derived_is_essential)))
+    """, (user_id, canonical_cat_name, tx.amount, tx.type, tx.description, tx.date, int(derived_is_essential)))
     tx_id = cursor.lastrowid
     conn.commit()
     conn.close()
 
-    detect_spending_anomalies(user_id=user_id)
+    detect_spending_anomalies(user_id=user_id, threshold_z=3.5)
 
     record_audit_log(
         user_role=role,
         action_type="TRANSACTION_CREATE",
         resource=f"TX#{tx_id}",
         status="SUCCESS",
-        details=f"Created {tx.type} '{tx.description}' of ${tx.amount:,.2f} in {tx.category}"
+        details=f"Created {tx.type} '{tx.description}' of ${tx.amount:,.2f} in {canonical_cat_name}"
     )
 
     return {"id": tx_id, "message": "Transaction recorded successfully (simulated)."}
@@ -145,7 +166,7 @@ def delete_transaction(
     if rows_affected == 0:
         raise HTTPException(status_code=404, detail="Transaction not found")
 
-    detect_spending_anomalies(user_id=user_id)
+    detect_spending_anomalies(user_id=user_id, threshold_z=3.5)
 
     record_audit_log(
         user_role=role,
@@ -159,7 +180,7 @@ def delete_transaction(
 
 @router.post("/scan-anomalies", response_model=AnomalyScanResponse)
 def run_anomaly_detection_scan(
-    threshold_z: float = Query(default=2.0, ge=1.0, le=5.0),
+    threshold_z: float = Query(default=3.5, ge=1.0, le=10.0),
     role: str = Depends(get_current_role)
 ):
     """Scans all transactions using Moving Average & Z-score anomaly detector."""
@@ -180,3 +201,4 @@ def run_anomaly_detection_scan(
         "anomalies": results["anomalies"],
         "scan_timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S")
     }
+

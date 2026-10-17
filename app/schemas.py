@@ -10,15 +10,15 @@ class UserBase(BaseModel):
     monthly_income: float = Field(default=0, ge=0)
 
 class ProfileUpdate(BaseModel):
-    full_name: Optional[str] = None
-    monthly_income: float = Field(default=0, ge=0)
-    est_monthly_expense: float = Field(default=0, ge=0)
-    risk_profile: Literal['conservative', 'moderate', 'aggressive'] = 'moderate'
-    inflation: float = Field(default=0.03, ge=0.0, le=0.20)
-    emergency_months: int = Field(default=6, ge=1, le=24)
-    expected_return: Optional[float] = None
-    volatility: Optional[float] = None
-    currency: Optional[str] = 'USD'
+    full_name: Optional[str] = Field(default=None, min_length=1)
+    monthly_income: Optional[float] = Field(default=None, ge=0)
+    est_monthly_expense: Optional[float] = Field(default=None, ge=0)
+    risk_profile: Optional[Literal['conservative', 'moderate', 'aggressive']] = None
+    inflation: Optional[float] = Field(default=None, ge=0.0, le=0.20)
+    emergency_months: Optional[int] = Field(default=None, ge=1, le=24)
+    expected_return: Optional[float] = Field(default=None, ge=0.0, le=1.0)
+    volatility: Optional[float] = Field(default=None, ge=0.0, le=1.0)
+    currency: Optional[Literal['USD', 'EUR', 'GBP', 'JPY', 'VND']] = None
 
 class RoleSwitchRequest(BaseModel):
     role: str = Field(..., description="Target role: Viewer, User, or Admin")
@@ -91,7 +91,20 @@ class GoalCreate(BaseModel):
     def validate_target_date(cls, v: str) -> str:
         if not re.match(r'^\d{4}-\d{2}-\d{2}$', v):
             raise ValueError('Target date must be in YYYY-MM-DD format')
+        from datetime import date as dt_date
+        try:
+            d = dt_date.fromisoformat(v)
+            if d <= dt_date.today():
+                raise ValueError('Target date must be in the future')
+        except ValueError as e:
+            if 'future' in str(e):
+                raise
+            raise ValueError('Target date must be in YYYY-MM-DD format')
         return v
+
+class SelectPlanRequest(BaseModel):
+    plan_name: Literal['Conservative', 'Balanced', 'Aggressive']
+    monthly_contribution: float = Field(..., ge=0)
 
 class CategoryAdjustment(BaseModel):
     category: str
@@ -104,13 +117,14 @@ class CategoryAdjustment(BaseModel):
 class PlanDetail(BaseModel):
     plan_name: str
     monthly_savings_target: float
-    months_to_complete: float
+    months_to_complete: Optional[float] = None
     feasibility: str
     monthly_gap: float
     surplus_or_deficit: str
     adjustments: List[CategoryAdjustment]
     total_spending_cut: float
     ai_recommendation: str
+
 
 class GoalPlanResponse(BaseModel):
     goal_id: Optional[int] = None

@@ -43,41 +43,38 @@ def update_user_profile(
     profile: ProfileUpdate,
     role: str = Depends(require_role("User"))
 ) -> Dict[str, Any]:
-    """Updates user 1 profile and sets risk return/volatility presets."""
-    preset = RISK_PRESETS.get(profile.risk_profile, RISK_PRESETS["moderate"])
-    exp_return = profile.expected_return if profile.expected_return is not None else preset["expected_return"]
-    vol = profile.volatility if profile.volatility is not None else preset["volatility"]
-    onboarded_val = 1 if profile.monthly_income > 0 else 0
+    """Updates user 1 profile fields dynamically."""
+    data = profile.model_dump(exclude_unset=True)
+    if not data:
+        return {"message": "No fields to update."}
 
     conn = get_db_connection()
     cursor = conn.cursor()
+    cursor.execute("SELECT * FROM users WHERE id = 1")
+    curr_user = cursor.fetchone()
+    if not curr_user:
+        conn.close()
+        raise HTTPException(status_code=404, detail="User profile not found")
 
-    cursor.execute("""
-        UPDATE users
-        SET monthly_income = ?,
-            est_monthly_expense = ?,
-            risk_profile = ?,
-            inflation = ?,
-            emergency_months = ?,
-            expected_return = ?,
-            volatility = ?,
-            currency = ?,
-            onboarded = MAX(onboarded, ?)
-        WHERE id = 1
-    """, (
-        profile.monthly_income,
-        profile.est_monthly_expense,
-        profile.risk_profile,
-        profile.inflation,
-        profile.emergency_months,
-        exp_return,
-        vol,
-        profile.currency or 'USD',
-        onboarded_val
-    ))
+    if "risk_profile" in data:
+        preset = RISK_PRESETS.get(data["risk_profile"], RISK_PRESETS["moderate"])
+        if "expected_return" not in data:
+            data["expected_return"] = preset["expected_return"]
+        if "volatility" not in data:
+            data["volatility"] = preset["volatility"]
 
-    if profile.full_name:
-        cursor.execute("UPDATE users SET full_name = ? WHERE id = 1", (profile.full_name,))
+    if "monthly_income" in data and data["monthly_income"] > 0:
+        data["onboarded"] = 1
+
+    set_clauses = []
+    params = []
+    for k, v in data.items():
+        set_clauses.append(f"{k} = ?")
+        params.append(v)
+
+    params.append(1)
+    query = f"UPDATE users SET {', '.join(set_clauses)} WHERE id = ?"
+    cursor.execute(query, params)
 
     conn.commit()
     conn.close()
@@ -87,7 +84,8 @@ def update_user_profile(
         action_type="PROFILE_UPDATE",
         resource="USER#1",
         status="SUCCESS",
-        details=f"Updated profile: Income ${profile.monthly_income:,.0f}, Est Expense ${profile.est_monthly_expense:,.0f}, Risk '{profile.risk_profile}'"
+        details=f"Updated profile fields: {list(data.keys())}"
     )
 
     return {"message": "Profile updated successfully."}
+

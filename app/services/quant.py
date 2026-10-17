@@ -1,5 +1,5 @@
 import numpy as np
-from typing import List, Dict, Any, Tuple
+from typing import List, Dict, Any, Tuple, Optional
 
 def required_monthly_payment(fv: float, pv: float, months: int, annual_return: float) -> float:
     """Annuity PMT formula for goal accumulation. Handles r=0 gracefully."""
@@ -69,7 +69,9 @@ def monte_carlo_goal(
     annual_return: float,
     annual_vol: float,
     n: int = 10000,
-    seed: int = 42
+    seed: int = 42,
+    custom_mean: Optional[float] = None,
+    custom_std: Optional[float] = None
 ) -> Dict[str, Any]:
     """Vectorized Monte Carlo goal simulation. Clamps wealth at >=0."""
     if months <= 0:
@@ -83,9 +85,13 @@ def monte_carlo_goal(
         }
     
     rng = np.random.default_rng(seed)
-    surplus_arr = np.array(monthly_surplus_history, dtype=float) if monthly_surplus_history else np.array([500.0])
-    surplus_mean = float(np.mean(surplus_arr)) if len(surplus_arr) > 0 else 500.0
-    surplus_std = float(np.std(surplus_arr, ddof=1)) if len(surplus_arr) > 1 else max(10.0, surplus_mean * 0.15)
+    if custom_mean is not None and custom_std is not None:
+        surplus_mean = float(custom_mean)
+        surplus_std = float(custom_std)
+    else:
+        surplus_arr = np.array(monthly_surplus_history, dtype=float) if monthly_surplus_history else np.array([500.0])
+        surplus_mean = float(np.mean(surplus_arr)) if len(surplus_arr) > 0 else 500.0
+        surplus_std = float(np.std(surplus_arr, ddof=1)) if len(surplus_arr) > 1 else max(10.0, surplus_mean * 0.15)
     
     mu_m = annual_return / 12.0
     sigma_m = max(1e-4, annual_vol / np.sqrt(12.0))
@@ -120,11 +126,17 @@ def monte_carlo_goal(
         "paths_percentiles": paths_percentiles
     }
 
+CFAR_FALLBACK_MULT = 1.25
+
 def cash_flow_at_risk(expense_history: List[float], conf: float = 0.95) -> float:
     """Calculates the empirical value/percentile of monthly living expenses at given confidence."""
     if not expense_history:
         return 0.0
     arr = np.array(expense_history, dtype=float)
+    if len(arr) < 6:
+        mean_val = float(np.mean(arr))
+        std_val = float(np.std(arr, ddof=1)) if len(arr) > 1 else 0.0
+        return round(mean_val + 1.65 * std_val, 2)
     return round(float(np.percentile(arr, conf * 100.0)), 2)
 
 def emergency_fund_needed(expense_history: List[float], conf: float = 0.95, months_cover: int = 6) -> float:

@@ -1,7 +1,7 @@
 from fastapi import APIRouter, Depends, HTTPException
 from typing import List, Dict, Any, Optional
 from app.database import get_db_connection
-from app.schemas import GoalCreate, GoalPlanResponse, ProgressStatus
+from app.schemas import GoalCreate, GoalPlanResponse, ProgressStatus, SelectPlanRequest
 from app.security import get_current_role, require_role
 from app.services.planner import generate_goal_plans
 from app.services.tracker import track_goal_progress
@@ -16,7 +16,7 @@ def list_goals(role: str = Depends(get_current_role)):
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("""
-        SELECT id, user_id, title, target_amount, current_savings, monthly_contribution, target_date, selected_plan, status, notes, created_at
+        SELECT id, user_id, title, target_amount, current_savings, initial_savings, monthly_contribution, target_date, selected_plan, status, notes, created_at
         FROM goals
         WHERE user_id = ?
         ORDER BY id ASC
@@ -34,10 +34,14 @@ def create_goal(
     user_id = 1
     conn = get_db_connection()
     cursor = conn.cursor()
+    cursor.execute("SELECT id FROM goals WHERE user_id = ? AND LOWER(title) = LOWER(?)", (user_id, goal.title.strip()))
+    if cursor.fetchone():
+        conn.close()
+        raise HTTPException(status_code=409, detail=f"A goal titled '{goal.title}' already exists.")
     cursor.execute("""
-        INSERT INTO goals (user_id, title, target_amount, current_savings, monthly_contribution, target_date, notes)
-        VALUES (?, ?, ?, ?, ?, ?, ?)
-    """, (user_id, goal.title, goal.target_amount, goal.current_savings, goal.monthly_contribution, goal.target_date, goal.notes))
+        INSERT INTO goals (user_id, title, target_amount, current_savings, initial_savings, monthly_contribution, target_date, notes)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    """, (user_id, goal.title.strip(), goal.target_amount, goal.current_savings, goal.current_savings, goal.monthly_contribution, goal.target_date, goal.notes))
     goal_id = cursor.lastrowid
     conn.commit()
     conn.close()
@@ -67,7 +71,7 @@ def calculate_custom_plans(
     user = cursor.fetchone()
     conn.close()
 
-    monthly_income = user["monthly_income"] if user else 5000.0
+    monthly_income = float(user["monthly_income"]) if user else 0.0
 
     plans = generate_goal_plans(
         target_amount=goal.target_amount,
@@ -97,7 +101,7 @@ def get_plans_for_goal(
     if not goal:
         raise HTTPException(status_code=404, detail="Goal not found")
 
-    monthly_income = user["monthly_income"] if user else 5000.0
+    monthly_income = float(user["monthly_income"]) if user else 0.0
 
     return generate_goal_plans(
         target_amount=goal["target_amount"],
@@ -124,21 +128,23 @@ def get_goal_progress(
 @router.post("/{goal_id}/select-plan")
 def select_plan_for_goal(
     goal_id: int,
-    payload: Dict[str, Any],
+    req: SelectPlanRequest,
     role: str = Depends(require_role("User"))
 ):
     """Updates the goal with the chosen plan."""
     user_id = 1
-    plan_name = payload.get("plan_name", "Balanced")
-    monthly_contribution = payload.get("monthly_contribution", 0.0)
-
     conn = get_db_connection()
     cursor = conn.cursor()
+    cursor.execute("SELECT id FROM goals WHERE id = ? AND user_id = ?", (goal_id, user_id))
+    if not cursor.fetchone():
+        conn.close()
+        raise HTTPException(status_code=404, detail="Goal not found")
+
     cursor.execute("""
         UPDATE goals
         SET selected_plan = ?, monthly_contribution = ?
         WHERE id = ? AND user_id = ?
-    """, (plan_name, monthly_contribution, goal_id, user_id))
+    """, (req.plan_name, req.monthly_contribution, goal_id, user_id))
     conn.commit()
     conn.close()
 
@@ -147,7 +153,8 @@ def select_plan_for_goal(
         action_type="GOAL_PLAN_SELECT",
         resource=f"GOAL#{goal_id}",
         status="SUCCESS",
-        details=f"Selected '{plan_name}' plan with monthly contribution of ${monthly_contribution:,.0f}"
+        details=f"Selected '{req.plan_name}' plan with monthly contribution of ${req.monthly_contribution:,.0f}"
     )
 
-    return {"message": f"Successfully activated {plan_name} plan for goal #{goal_id}."}
+    return {"message": f"Successfully activated {req.plan_name} plan for goal #{goal_id}."}
+
