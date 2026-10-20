@@ -1,0 +1,62 @@
+[
+  {
+    "log_id": 1,
+    "timestamp": "2026-10-07T09:00:00Z",
+    "user_role": "Admin",
+    "action_type": "DATABASE_SEED",
+    "resource": "SYSTEM",
+    "status": "SUCCESS",
+    "details": "Initialized default fintech demo database with Vietnamese VND sample data (38M VND monthly income)",
+    "ip_address": "127.0.0.1"
+  },
+  {
+    "log_id": 2,
+    "timestamp": "2026-10-08T14:22:15Z",
+    "user_role": "User",
+    "action_type": "GOAL_PLAN_GENERATE",
+    "resource": "GOAL#1",
+    "status": "SUCCESS",
+    "details": "Generated 3 AI financial plans for Emergency Fund (Target: 120,000,000 ₫, Current: 45,000,000 ₫)",
+    "ip_address": "127.0.0.1"
+  },
+  {
+    "log_id": 3,
+    "timestamp": "2026-10-09T08:15:30Z",
+    "user_role": "User",
+    "action_type": "ANOMALY_SCAN",
+    "resource": "TRANSACTIONS",
+    "status": "SUCCESS",
+    "details": "Scanned 32 transactions. Flagged 2 anomalous records (Apple iPad Air 18.5M ₫, Z=+3.82; Luxury Lounge 4.8M ₫, Z=+2.95)",
+    "ip_address": "127.0.0.1"
+  },
+  {
+    "log_id": 4,
+    "timestamp": "2026-10-09T10:45:10Z",
+    "user_role": "User",
+    "action_type": "SIMULATION_RUN",
+    "resource": "SIMULATOR",
+    "status": "SUCCESS",
+    "details": "Ran one_off_purchase simulation of 32,000,000 ₫ (iPhone 16 Pro Max). Impact: MODERATE (+2.4 months goal delay)",
+    "ip_address": "127.0.0.1"
+  },
+  {
+    "log_id": 5,
+    "timestamp": "2026-10-09T11:00:00Z",
+    "user_role": "User",
+    "action_type": "SANDBOX_CREATE_PROPOSAL",
+    "resource": "PROPOSAL#1",
+    "status": "SUCCESS",
+    "details": "Created pending proposal 'Discretionary Spending Optimization Plan' (+4,400,000 ₫/month savings boost)",
+    "ip_address": "127.0.0.1"
+  },
+  {
+    "log_id": 6,
+    "timestamp": "2026-10-09T11:05:42Z",
+    "user_role": "User",
+    "action_type": "SANDBOX_APPROVED",
+    "resource": "PROPOSAL#1",
+    "status": "APPROVED",
+    "details": "User approved proposal 'Discretionary Spending Optimization Plan'. Applied +4.4M VND/mo to Emergency Fund trajectory.",
+    "ip_address": "127.0.0.1"
+  }
+]

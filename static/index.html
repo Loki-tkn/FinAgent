@@ -1,0 +1,1156 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Personal Financial Agent | Fintechathon</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body class="dark-theme">
+    <div class="app-layout">
+        <aside class="sidebar">
+            <div class="brand">
+                <div class="brand-icon">
+                    <i data-lucide="sparkles"></i>
+                </div>
+                <div class="brand-text">
+                    <h2>FinAgent<span class="badge-ai">AI</span></h2>
+                    <span class="brand-subtitle">Fintechathon MVP</span>
+                </div>
+            </div>
+
+            <div class="simulated-pill">
+                <i data-lucide="shield-alert"></i>
+                <span>SIMULATED SANDBOX</span>
+            </div>
+
+            <nav class="nav-menu">
+                <button class="nav-item active" data-tab="tab-dashboard" id="nav-dashboard">
+                    <i data-lucide="layout-dashboard"></i>
+                    <span>Dashboard</span>
+                </button>
+                <button class="nav-item" data-tab="tab-planner" id="nav-planner">
+                    <i data-lucide="target"></i>
+                    <span>Goal Planner</span>
+                    <span class="nav-badge">3 Plans</span>
+                </button>
+                <button class="nav-item" data-tab="tab-anomalies" id="nav-anomalies">
+                    <i data-lucide="activity"></i>
+                    <span>Anomaly Detector</span>
+                    <span class="nav-badge alert-badge" id="anomaly-badge">0</span>
+                </button>
+                <button class="nav-item" data-tab="tab-simulator" id="nav-simulator">
+                    <i data-lucide="sliders"></i>
+                    <span>What-If Simulator</span>
+                </button>
+                <button class="nav-item" data-tab="tab-tracker" id="nav-tracker">
+                    <i data-lucide="trending-up"></i>
+                    <span>Progress Tracking</span>
+                </button>
+                <button class="nav-item" data-tab="tab-sandbox" id="nav-sandbox">
+                    <i data-lucide="check-square"></i>
+                    <span>Sandbox Approvals</span>
+                    <span class="nav-badge warn-badge" id="sandbox-badge">0</span>
+                </button>
+                <button class="nav-item" data-tab="tab-transactions" id="nav-transactions">
+                    <i data-lucide="receipt"></i>
+                    <span>Transactions</span>
+                </button>
+                <button class="nav-item" data-tab="tab-settings" id="nav-settings">
+                    <i data-lucide="settings"></i>
+                    <span>Profile & Settings</span>
+                </button>
+                <button class="nav-item" data-tab="tab-audit" id="nav-audit">
+                    <i data-lucide="file-text"></i>
+                    <span>Audit Logs</span>
+                </button>
+                <button class="nav-item" data-tab="tab-security" id="nav-security">
+                    <i data-lucide="shield-check"></i>
+                    <span>Security & Docs</span>
+                </button>
+            </nav>
+
+            <div class="sidebar-footer">
+                <div class="system-status-indicator">
+                    <span class="pulse-dot"></span>
+                    <span>Local AI Engine Active</span>
+                </div>
+            </div>
+        </aside>
+
+        <main class="main-content">
+            <header class="top-header">
+                <div class="header-left">
+                    <h1 id="page-title">Financial Dashboard</h1>
+                    <p class="header-subtext" id="page-subtitle">AI-assisted personal wealth optimization and simulated decision sandbox.</p>
+                </div>
+
+                <div class="header-right">
+                    <div class="currency-tag">
+                        <i data-lucide="coins"></i>
+                        <span>USD ($)</span>
+                    </div>
+
+                    <div class="role-selector-card">
+                        <label for="role-select"><i data-lucide="user-check"></i> Role:</label>
+                        <select id="role-select" onchange="handleRoleChange(this.value)">
+                            <option value="User" selected>User (Full Access & Approvals)</option>
+                            <option value="Viewer">Viewer (Read-Only Demo)</option>
+                            <option value="Admin">Admin (System Controls & Seed)</option>
+                        </select>
+                    </div>
+
+                    <button class="btn btn-secondary btn-sm" onclick="switchTab('tab-settings')" title="Configure Profile">
+                        <i data-lucide="user-cog"></i> Profile
+                    </button>
+                </div>
+            </header>
+
+            <div id="low-data-banner" class="banner-low-data" style="display: none; background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.4); border-radius: 12px; padding: 0.75rem 1.25rem; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.6rem; font-size: 0.82rem; color: #fde68a;">
+                <i data-lucide="alert-circle" style="color: #f59e0b; width: 18px; height: 18px;"></i>
+                <span><strong>Notice:</strong> Estimates based on your declared expenses; add 2+ months of transactions for accurate historical analysis.</span>
+            </div>
+
+            <!-- TAB 1: DASHBOARD -->
+            <section id="tab-dashboard" class="tab-pane active">
+                <div id="dashboard-setup-banner" style="display: none; background: linear-gradient(90deg, rgba(6, 182, 212, 0.15), rgba(139, 92, 246, 0.1)); border: 1px solid rgba(6, 182, 212, 0.3); border-radius: 12px; padding: 1.25rem; margin-bottom: 1.5rem; text-align: center;">
+                    <h3><i data-lucide="sparkles" style="color: #06b6d4; display: inline-block;"></i> Welcome to your Financial Agent!</h3>
+                    <p style="font-size: 0.85rem; color: #9ca3af; margin: 0.4rem 0 1rem 0;">Get started by entering your monthly income and savings goal or loading sample demo data.</p>
+                    <div style="display: flex; gap: 0.75rem; justify-content: center;">
+                        <button class="btn btn-primary btn-sm" onclick="openOnboardingWizard()"><i data-lucide="user-plus"></i> Setup Profile</button>
+                        <button class="btn btn-secondary btn-sm" onclick="handleLoadDemoData()"><i data-lucide="database"></i> Load Demo Data</button>
+                    </div>
+                </div>
+
+                <div class="kpi-grid">
+                    <div class="kpi-card">
+                        <div class="kpi-header">
+                            <span class="kpi-title">Monthly Income</span>
+                            <div class="kpi-icon icon-emerald"><i data-lucide="arrow-down-left"></i></div>
+                        </div>
+                        <div class="kpi-value" id="kpi-income">$0</div>
+                        <div class="kpi-footer text-success" id="kpi-income-source-footer">
+                            <i data-lucide="check-circle-2"></i> Declared Income
+                        </div>
+                    </div>
+
+                    <div class="kpi-card">
+                        <div class="kpi-header">
+                            <span class="kpi-title">Monthly Expenses</span>
+                            <div class="kpi-icon icon-rose"><i data-lucide="arrow-up-right"></i></div>
+                        </div>
+                        <div class="kpi-value" id="kpi-expense">$0</div>
+                        <div class="kpi-footer text-muted" id="kpi-expense-breakdown">
+                            Needs: $0 | Wants: $0
+                        </div>
+                    </div>
+
+                    <div class="kpi-card">
+                        <div class="kpi-header">
+                            <span class="kpi-title">Monthly Surplus</span>
+                            <div class="kpi-icon icon-cyan"><i data-lucide="wallet-cards"></i></div>
+                        </div>
+                        <div class="kpi-value text-cyan" id="kpi-surplus">$0</div>
+                        <div class="kpi-footer">
+                            Savings Rate: <strong id="kpi-savings-rate">0.0%</strong>
+                        </div>
+                    </div>
+
+                    <div class="kpi-card health-score-card">
+                        <div class="kpi-header">
+                            <span class="kpi-title">Financial Health Score</span>
+                            <div class="kpi-icon icon-amber"><i data-lucide="heart-pulse"></i></div>
+                        </div>
+                        <div class="health-score-display">
+                            <div class="score-circle" id="health-score-badge">
+                                <span class="score-number" id="kpi-health-score">0</span>
+                                <span class="score-max">/100</span>
+                            </div>
+                            <div class="score-info">
+                                <span class="score-rating" id="kpi-health-rating">Setup Required</span>
+                                <span class="score-grade" id="kpi-health-grade">Grade -</span>
+                            </div>
+                        </div>
+                        <div class="health-mini-bar">
+                            <div class="health-bar-fill" id="health-bar-fill" style="width: 0%;"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="dashboard-grid">
+                    <div class="card chart-card">
+                        <div class="card-header">
+                            <div class="card-title">
+                                <i data-lucide="line-chart"></i>
+                                <h3>Monthly Cash Flow Trends (Income vs Expense)</h3>
+                            </div>
+                            <span class="card-badge">USD Trajectory</span>
+                        </div>
+                        <div class="chart-container" id="cashflow-chart-wrap">
+                            <canvas id="cashFlowChart"></canvas>
+                        </div>
+                    </div>
+
+                    <div class="card chart-card">
+                        <div class="card-header">
+                            <div class="card-title">
+                                <i data-lucide="pie-chart"></i>
+                                <h3>Expense Category Breakdown</h3>
+                            </div>
+                            <span class="card-badge">Essential vs Wants</span>
+                        </div>
+                        <div class="chart-container donut-chart-container" id="category-donut-wrap">
+                            <canvas id="categoryDonutChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="dashboard-grid-2">
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-title">
+                                <i data-lucide="stethoscope"></i>
+                                <h3>AI Financial Health Diagnostic</h3>
+                            </div>
+                        </div>
+                        <div class="health-breakdown-list" id="health-breakdown-container"></div>
+                        <div class="ai-insight-box">
+                            <i data-lucide="bot"></i>
+                            <div class="insight-text" id="health-ai-advice">
+                                Complete your profile setup to generate a financial health diagnostic.
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-title">
+                                <i data-lucide="flag"></i>
+                                <h3>Active Savings Goals</h3>
+                            </div>
+                            <button class="btn btn-sm btn-primary" onclick="switchTab('tab-planner')">
+                                <i data-lucide="plus"></i> Plan New Goal
+                            </button>
+                        </div>
+                        <div class="goals-snapshot-list" id="dashboard-goals-container"></div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 2: GOAL PLANNER & QUANT RISK ANALYSIS -->
+            <section id="tab-planner" class="tab-pane">
+                <div class="section-header">
+                    <div>
+                        <h2>AI Goal Planner & Strategy Generator</h2>
+                        <p>Calculate required monthly savings and compare 3 concrete AI-optimized plans.</p>
+                    </div>
+                </div>
+
+                <div class="planner-layout">
+                    <div class="card planner-input-card">
+                        <div class="card-header">
+                            <div class="card-title">
+                                <i data-lucide="calculator"></i>
+                                <h3>Set Goal Parameters</h3>
+                            </div>
+                        </div>
+                        <form id="goal-planner-form" onsubmit="handleCalculatePlans(event)">
+                            <div class="form-group">
+                                <label for="goal-title">Goal Title</label>
+                                <input type="text" id="goal-title" class="form-control" value="Emergency Fund" required placeholder="e.g. Buying a Car, Wedding, Home Downpayment">
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="goal-target">Target Amount ($)</label>
+                                    <input type="number" id="goal-target" class="form-control" value="10000" step="100" min="10" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="goal-current">Current Savings ($)</label>
+                                    <input type="number" id="goal-current" class="form-control" value="2000" step="50" min="0" required>
+                                </div>
+                            </div>
+
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="goal-date">Target Deadline</label>
+                                    <input type="date" id="goal-date" class="form-control" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="goal-income">Monthly Income ($)</label>
+                                    <input type="number" id="goal-income" class="form-control" value="4000" step="50" required>
+                                </div>
+                            </div>
+
+                            <button type="submit" class="btn btn-primary btn-block" id="btn-generate-plans">
+                                <i data-lucide="sparkles"></i> Generate 3 AI Action Plans
+                            </button>
+                        </form>
+                    </div>
+
+                    <div class="card planner-overview-card" id="planner-overview-box">
+                        <div class="card-header">
+                            <div class="card-title">
+                                <i data-lucide="compass"></i>
+                                <h3>AI Strategy Summary</h3>
+                            </div>
+                        </div>
+                        <div class="planner-summary-body" id="planner-summary-content">
+                            <div class="placeholder-state">
+                                <i data-lucide="cpu"></i>
+                                <p>Click "Generate 3 AI Action Plans" to analyze required monthly savings and explore Conservative, Balanced, and Aggressive strategies.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="plans-grid" id="plans-container" style="display: none;"></div>
+
+                <!-- Quant Monte Carlo Risk Analysis Card -->
+                <div class="card" id="quant-risk-card" style="display: none; margin-top: 1.5rem;">
+                    <div class="card-header">
+                        <div class="card-title">
+                            <i data-lucide="activity"></i>
+                            <h3>Quantitative Goal Risk Analysis (Monte Carlo N=10,000)</h3>
+                        </div>
+                        <span class="card-badge" id="mc-prob-badge">Probability: --%</span>
+                    </div>
+                    
+                    <div class="dashboard-grid">
+                        <div>
+                            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.6rem; margin-bottom: 1rem;">
+                                <div class="tracker-stat-pill">
+                                    <span>Success Probability</span>
+                                    <strong id="mc-stat-prob" class="text-emerald">--%</strong>
+                                </div>
+                                <div class="tracker-stat-pill">
+                                    <span>Inflation-Adj. Target</span>
+                                    <strong id="mc-stat-real-target">$--</strong>
+                                </div>
+                                <div class="tracker-stat-pill">
+                                    <span>Annuity PMT (Needed)</span>
+                                    <strong id="mc-stat-pmt" class="text-cyan">$--/mo</strong>
+                                </div>
+                            </div>
+
+                            <form id="mc-params-form" onsubmit="handleRunGoalMonteCarlo(event)" style="background: rgba(0,0,0,0.2); padding: 0.85rem; border-radius: 8px; font-size: 0.8rem;">
+                                <div class="form-row">
+                                    <div class="form-group">
+                                        <label>Expected Return (Ann.)</label>
+                                        <input type="number" id="mc-input-return" class="form-control form-control-sm" step="0.005" min="0" max="0.5" value="0.05">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Volatility (Ann.)</label>
+                                        <input type="number" id="mc-input-vol" class="form-control form-control-sm" step="0.005" min="0" max="0.5" value="0.10">
+                                    </div>
+                                    <div class="form-group">
+                                        <label>Inflation (Ann.)</label>
+                                        <input type="number" id="mc-input-inf" class="form-control form-control-sm" step="0.005" min="0" max="0.2" value="0.03">
+                                    </div>
+                                </div>
+                                <button type="submit" class="btn btn-secondary btn-sm btn-block">
+                                    <i data-lucide="refresh-cw"></i> Recalculate Risk Engine
+                                </button>
+                            </form>
+                        </div>
+
+                        <div class="chart-container" style="height: 220px;">
+                            <canvas id="mcFanChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card" id="adjustments-detail-card" style="display: none; margin-top: 1.5rem;">
+                    <div class="card-header">
+                        <div class="card-title">
+                            <i data-lucide="scissors"></i>
+                            <h3>Recommended Category Spending Cuts (Balanced Strategy)</h3>
+                        </div>
+                        <button class="btn btn-secondary btn-sm" onclick="stageProposalFromPlan()">
+                            <i data-lucide="box"></i> Stage to Sandbox for Approval
+                        </button>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Category</th>
+                                    <th>Current Monthly</th>
+                                    <th>Proposed Cut</th>
+                                    <th>Recommended Spend</th>
+                                    <th>Monthly Saved</th>
+                                    <th>Optimization Rationale</th>
+                                </tr>
+                            </thead>
+                            <tbody id="adjustments-table-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 3: ANOMALY DETECTOR -->
+            <section id="tab-anomalies" class="tab-pane">
+                <div class="section-header">
+                    <div>
+                        <h2>Spending Anomaly Detection</h2>
+                        <p>Robust statistical detection using Modified Z-Score on log distributions (Median / MAD) to flag irregular spending spikes.</p>
+                    </div>
+                    <div class="header-actions">
+                        <button class="btn btn-primary" onclick="runAnomalyScan()">
+                            <i data-lucide="scan"></i> Scan Transactions Now
+                        </button>
+                    </div>
+                </div>
+
+                <div class="anomaly-stats-grid">
+                    <div class="kpi-card">
+                        <div class="kpi-header">
+                            <span class="kpi-title">Anomaly Algorithm</span>
+                            <div class="kpi-icon icon-cyan"><i data-lucide="binary"></i></div>
+                        </div>
+                        <div class="kpi-value">Modified Z &gt; 3.5</div>
+                        <div class="kpi-footer text-muted">Median / MAD on Log Amounts</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-header">
+                            <span class="kpi-title">Scanned Transactions</span>
+                            <div class="kpi-icon icon-emerald"><i data-lucide="list-checks"></i></div>
+                        </div>
+                        <div class="kpi-value" id="anomaly-scanned-count">0</div>
+                        <div class="kpi-footer text-muted">Recorded Dataset</div>
+                    </div>
+                    <div class="kpi-card">
+                        <div class="kpi-header">
+                            <span class="kpi-title">Flagged Anomalies</span>
+                            <div class="kpi-icon icon-rose"><i data-lucide="alert-triangle"></i></div>
+                        </div>
+                        <div class="kpi-value text-rose" id="anomaly-detected-count">0</div>
+                        <div class="kpi-footer text-rose">Requires review</div>
+                    </div>
+                </div>
+
+                <div class="card" style="margin-top: 1.5rem;">
+                    <div class="card-header">
+                        <div class="card-title">
+                            <i data-lucide="alert-octagon"></i>
+                            <h3>Flagged Irregular Expenses</h3>
+                        </div>
+                        <span class="card-badge" id="anomaly-timestamp">Last scanned: Ready</span>
+                    </div>
+                    <div class="anomalies-list" id="anomalies-list-container"></div>
+                </div>
+            </section>
+
+            <!-- TAB 4: WHAT-IF SIMULATOR & LOAN VS CASH -->
+            <section id="tab-simulator" class="tab-pane">
+                <div class="section-header">
+                    <div>
+                        <h2>What-If Financial Decision Simulator</h2>
+                        <p>Simulate purchases, rent changes, salary raises, or compare financing vs paying full cash.</p>
+                    </div>
+                </div>
+
+                <div class="simulator-layout">
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-title">
+                                <i data-lucide="cpu"></i>
+                                <h3>Configure What-If Scenario</h3>
+                            </div>
+                        </div>
+                        <form id="simulator-form" onsubmit="handleRunSimulation(event)">
+                            <div class="form-group">
+                                <label for="sim-type">Scenario Type</label>
+                                <select id="sim-type" class="form-control" onchange="updateSimFormLabels()">
+                                    <option value="one_off_purchase">One-off Major Purchase (e.g. Laptop, Vacation, Car)</option>
+                                    <option value="recurring_expense_change">Monthly Expense Increase (e.g. Rent, Gym, Subscription)</option>
+                                    <option value="income_change">Monthly Income Shift (e.g. Promotion, Salary Raise/Cut)</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="sim-desc">Scenario Description</label>
+                                <input type="text" id="sim-desc" class="form-control" value="Buy Apple MacBook Pro" required>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="sim-amount" id="sim-amount-label">Purchase Amount ($)</label>
+                                <input type="number" id="sim-amount" class="form-control" value="1500" step="50" required>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="sim-goal-select">Target Goal to Evaluate</label>
+                                <select id="sim-goal-select" class="form-control"></select>
+                            </div>
+
+                            <div class="preset-buttons">
+                                <label class="text-muted" style="font-size: 0.8rem; display: block; margin-bottom: 0.4rem;">Quick Presets:</label>
+                                <div class="btn-group-wrap">
+                                    <button type="button" class="btn btn-preset" onclick="setSimPreset('one_off_purchase', 'New Laptop', 1500)">Laptop ($1.5k)</button>
+                                    <button type="button" class="btn btn-preset" onclick="setSimPreset('one_off_purchase', 'Vacation Trip', 2500)">Vacation ($2.5k)</button>
+                                    <button type="button" class="btn btn-preset" onclick="setSimPreset('recurring_expense_change', 'Rent Upgrade', 250)">+$250 Rent/mo</button>
+                                    <button type="button" class="btn btn-preset" onclick="setSimPreset('income_change', 'Promotion Raise', 600)">+$600 Salary/mo</button>
+                                </div>
+                            </div>
+
+                            <button type="submit" class="btn btn-primary btn-block" style="margin-top: 1.2rem;">
+                                <i data-lucide="play"></i> Run Simulation
+                            </button>
+                        </form>
+                    </div>
+
+                    <div class="card" id="sim-result-card">
+                        <div class="card-header">
+                            <div class="card-title">
+                                <i data-lucide="activity"></i>
+                                <h3>Simulation Impact Analysis</h3>
+                            </div>
+                            <span class="card-badge" id="sim-impact-tag">READY</span>
+                        </div>
+                        <div class="sim-results-body" id="sim-results-container">
+                            <div class="placeholder-state">
+                                <i data-lucide="sparkles"></i>
+                                <p>Select a scenario and click "Run Simulation" to visualize timeline delays or accelerations.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Loan vs Cash Decision Card -->
+                <div class="card" style="margin-top: 1.5rem;">
+                    <div class="card-header">
+                        <div class="card-title">
+                            <i data-lucide="scale"></i>
+                            <h3>Loan vs Cash Opportunity Cost Evaluator (NPV Comparison)</h3>
+                        </div>
+                        <span class="card-badge" id="loan-vs-cash-badge">Compare Financing</span>
+                    </div>
+                    
+                    <div class="dashboard-grid">
+                        <form onsubmit="handleLoanVsCashSubmit(event)">
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Total Item Price ($)</label>
+                                    <input type="number" id="lvc-price" class="form-control" value="25000" min="100" step="500" required>
+                                </div>
+                                <div class="form-group">
+                                    <label>Down Payment ($)</label>
+                                    <input type="number" id="lvc-down" class="form-control" value="5000" min="0" step="100" required>
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label>Loan APR Rate</label>
+                                    <input type="number" id="lvc-rate" class="form-control" value="0.06" step="0.005" min="0" max="0.5" required>
+                                </div>
+                                <div class="form-group">
+                                    <label>Loan Term (Months)</label>
+                                    <input type="number" id="lvc-months" class="form-control" value="36" min="1" max="120" required>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>Opportunity Cost Discount Rate (Investment Yield)</label>
+                                <input type="number" id="lvc-opp-return" class="form-control" value="0.05" step="0.005" min="0" max="0.5">
+                            </div>
+                            <button type="submit" class="btn btn-primary btn-sm btn-block">
+                                <i data-lucide="calculator"></i> Calculate NPV & Better Choice
+                            </button>
+                        </form>
+
+                        <div id="lvc-result-box" style="background: rgba(0,0,0,0.2); padding: 1rem; border-radius: 8px; display: flex; flex-direction: column; justify-content: center;">
+                            <div class="placeholder-state" style="padding: 1rem;">
+                                <i data-lucide="info"></i>
+                                <p>Enter purchase details and click Calculate to evaluate loan NPV vs paying cash.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 5: PROGRESS TRACKING -->
+            <section id="tab-tracker" class="tab-pane">
+                <div class="section-header">
+                    <div>
+                        <h2>Milestone Progress Tracker</h2>
+                        <p>Compare actual saved funds against target trajectory and calculate dynamic catch-up adjustments.</p>
+                    </div>
+                </div>
+
+                <div class="tracker-layout">
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-title">
+                                <i data-lucide="milestone"></i>
+                                <h3>Active Goal Trajectory Status</h3>
+                            </div>
+                        </div>
+                        <div id="tracker-goals-list"></div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-title">
+                                <i data-lucide="trending-up"></i>
+                                <h3>Savings Growth Trajectory</h3>
+                            </div>
+                            <span class="card-badge">Target vs Actual</span>
+                        </div>
+                        <div class="chart-container">
+                            <canvas id="trajectoryChart"></canvas>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 6: SANDBOX APPROVALS -->
+            <section id="tab-sandbox" class="tab-pane">
+                <div class="section-header">
+                    <div>
+                        <h2>Sandbox Financial Proposal Hub</h2>
+                        <p>Simulate financial actions without risking real funds. Explicit user approval is mandatory before any plan is applied.</p>
+                    </div>
+                    <button class="btn btn-secondary" onclick="openNewProposalModal()">
+                        <i data-lucide="plus-circle"></i> Create Sandbox Proposal
+                    </button>
+                </div>
+
+                <div class="workflow-steps-banner">
+                    <div class="wf-step">
+                        <div class="wf-number">1</div>
+                        <div class="wf-text">
+                            <strong>AI Stage Proposal</strong>
+                            <span>Rule-based engine drafts budget adjustments</span>
+                        </div>
+                    </div>
+                    <div class="wf-arrow"><i data-lucide="arrow-right"></i></div>
+                    <div class="wf-step">
+                        <div class="wf-number">2</div>
+                        <div class="wf-text">
+                            <strong>Sandbox Isolation</strong>
+                            <span>Safe testing environment with zero real money risk</span>
+                        </div>
+                    </div>
+                    <div class="wf-arrow"><i data-lucide="arrow-right"></i></div>
+                    <div class="wf-step">
+                        <div class="wf-number">3</div>
+                        <div class="wf-text">
+                            <strong>User Authorization</strong>
+                            <span>Approve or Reject with full immutable audit trail</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card" style="margin-top: 1.5rem;">
+                    <div class="card-header">
+                        <div class="card-title">
+                            <i data-lucide="layers"></i>
+                            <h3>Staged Proposals Queue</h3>
+                        </div>
+                    </div>
+                    <div class="proposals-list" id="sandbox-proposals-container"></div>
+                </div>
+            </section>
+
+            <!-- TAB 7: TRANSACTIONS -->
+            <section id="tab-transactions" class="tab-pane">
+                <div class="section-header">
+                    <div>
+                        <h2>Financial Transactions</h2>
+                        <p>Track your actual or simulated income and expense records.</p>
+                    </div>
+                    <div class="header-actions" style="display: flex; gap: 0.5rem;">
+                        <button class="btn btn-secondary" onclick="openAddCategoryModal()">
+                            <i data-lucide="folder-plus"></i> New Category
+                        </button>
+                        <button class="btn btn-primary" onclick="openAddTransactionModal()">
+                            <i data-lucide="plus"></i> Add Transaction
+                        </button>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header">
+                        <div class="card-title">
+                            <i data-lucide="list"></i>
+                            <h3>Transaction History</h3>
+                        </div>
+                        <div class="table-filters">
+                            <select id="tx-filter-type" onchange="loadTransactions()" class="form-control form-control-sm">
+                                <option value="">All Types</option>
+                                <option value="income">Income Only</option>
+                                <option value="expense">Expense Only</option>
+                            </select>
+                            <label class="checkbox-inline">
+                                <input type="checkbox" id="tx-filter-anomaly" onchange="loadTransactions()"> Anomaly Only
+                            </label>
+                        </div>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Date</th>
+                                    <th>Type</th>
+                                    <th>Category</th>
+                                    <th>Description</th>
+                                    <th>Amount</th>
+                                    <th>Essential</th>
+                                    <th>Status / Anomaly</th>
+                                    <th>Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="transactions-table-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 8: PROFILE & SETTINGS -->
+            <section id="tab-settings" class="tab-pane">
+                <div class="section-header">
+                    <div>
+                        <h2>User Profile & Financial Settings</h2>
+                        <p>Configure your declared monthly income, risk tolerance, inflation expectations, and emergency reserves.</p>
+                    </div>
+                </div>
+
+                <div class="planner-layout">
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-title">
+                                <i data-lucide="user"></i>
+                                <h3>Profile & Parameters</h3>
+                            </div>
+                        </div>
+                        <form id="profile-form" onsubmit="handleSaveProfile(event)">
+                            <div class="form-group">
+                                <label for="prof-fullname">Full Name</label>
+                                <input type="text" id="prof-fullname" class="form-control" placeholder="e.g. Alex Morgan">
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="prof-income">Monthly Income ($)</label>
+                                    <input type="number" id="prof-income" class="form-control" min="0" step="50" required>
+                                </div>
+                                <div class="form-group">
+                                    <label for="prof-expense">Estimated Monthly Expense ($)</label>
+                                    <input type="number" id="prof-expense" class="form-control" min="0" step="50" placeholder="Used when transaction history is low">
+                                </div>
+                            </div>
+                            <div class="form-row">
+                                <div class="form-group">
+                                    <label for="prof-risk">Risk Profile</label>
+                                    <select id="prof-risk" class="form-control">
+                                        <option value="conservative">Conservative (Low Risk, ~3% return)</option>
+                                        <option value="moderate" selected>Moderate (Balanced, ~5% return)</option>
+                                        <option value="aggressive">Aggressive (Growth, ~8% return)</option>
+                                    </select>
+                                </div>
+                                <div class="form-group">
+                                    <label for="prof-emergency-months">Emergency Buffer Target</label>
+                                    <select id="prof-emergency-months" class="form-control">
+                                        <option value="3">3 Months</option>
+                                        <option value="6" selected>6 Months (Recommended)</option>
+                                        <option value="9">9 Months</option>
+                                        <option value="12">12 Months</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label for="prof-inflation">Expected Annual Inflation Rate</label>
+                                <input type="number" id="prof-inflation" class="form-control" step="0.005" min="0" max="0.20" value="0.03">
+                                <span class="text-muted" style="font-size: 0.72rem;">Default: 0.03 (3.0% / year)</span>
+                            </div>
+                            <button type="submit" class="btn btn-primary btn-block">
+                                <i data-lucide="save"></i> Save Profile Settings
+                            </button>
+                        </form>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-title">
+                                <i data-lucide="database"></i>
+                                <h3>Data Management & Demo Tools</h3>
+                            </div>
+                        </div>
+                        <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1.25rem;">
+                            <p><strong>Demo Mode Control:</strong> Real users can enter clean personal financial data. Demo data can be loaded or cleared at any time for testing and competition evaluation.</p>
+                        </div>
+                        <div style="display: flex; flex-direction: column; gap: 0.85rem;">
+                            <button class="btn btn-secondary" onclick="handleLoadDemoData()">
+                                <i data-lucide="download-cloud"></i> Load 12-Month Demo Dataset
+                            </button>
+                            <button class="btn btn-danger" onclick="handleClearAllData()">
+                                <i data-lucide="trash-2"></i> Clear All User Data (Reset to Blank)
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 9: AUDIT LOGS -->
+            <section id="tab-audit" class="tab-pane">
+                <div class="section-header">
+                    <div>
+                        <h2>Immutable System Audit Trail</h2>
+                        <p>Complete log of timestamps, role tiers, actions, approvals, calculations, and security events.</p>
+                    </div>
+                    <button class="btn btn-secondary" onclick="loadAuditLogs()">
+                        <i data-lucide="refresh-cw"></i> Refresh Logs
+                    </button>
+                </div>
+
+                <div class="card">
+                    <div class="table-responsive">
+                        <table class="data-table log-table">
+                            <thead>
+                                <tr>
+                                    <th>Timestamp</th>
+                                    <th>Role Tier</th>
+                                    <th>Action Type</th>
+                                    <th>Resource</th>
+                                    <th>Status</th>
+                                    <th>Details</th>
+                                    <th>Client IP</th>
+                                </tr>
+                            </thead>
+                            <tbody id="audit-table-body"></tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+
+            <!-- TAB 10: SECURITY -->
+            <section id="tab-security" class="tab-pane">
+                <div class="section-header">
+                    <div>
+                        <h2>Security Self-Assessment & Architecture</h2>
+                        <p>Fintech security posture, permission tiers, sandbox isolation, and known risks.</p>
+                    </div>
+                </div>
+
+                <div class="security-grid">
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-title">
+                                <i data-lucide="shield"></i>
+                                <h3>Role-Based Access Control (RBAC)</h3>
+                            </div>
+                        </div>
+                        <div class="rbac-card-body">
+                            <div class="tier-item">
+                                <span class="badge badge-viewer">Viewer Tier</span>
+                                <p><strong>Read-Only Access:</strong> Can inspect dashboards, review goal projections, view audit logs. Cannot modify budgets, stage proposals, or execute approvals.</p>
+                            </div>
+                            <div class="tier-item">
+                                <span class="badge badge-user">User Tier</span>
+                                <p><strong>Personal Finance Manager:</strong> Can add/delete transactions, create savings goals, generate AI plans, execute what-if simulations, stage and approve sandbox proposals.</p>
+                            </div>
+                            <div class="tier-item">
+                                <span class="badge badge-admin">Admin Tier</span>
+                                <p><strong>System & Demo Administrator:</strong> Full access including database reseed, benchmark demo resets, system log inspections, and global configuration.</p>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header">
+                            <div class="card-title">
+                                <i data-lucide="lock"></i>
+                                <h3>Credential & Data Safety Guarantee</h3>
+                            </div>
+                        </div>
+                        <div class="security-feature-list">
+                            <div class="sec-item">
+                                <i data-lucide="check-circle" class="text-success"></i>
+                                <div>
+                                    <strong>Zero Bank Credentials Stored:</strong>
+                                    <p>The application never requests or stores bank passwords, OTPs, or credit card numbers.</p>
+                                </div>
+                            </div>
+                            <div class="sec-item">
+                                <i data-lucide="check-circle" class="text-success"></i>
+                                <div>
+                                    <strong>Sandbox Isolation:</strong>
+                                    <p>All financial actions are strictly staged as pending proposals until the user explicitly authorizes them.</p>
+                                </div>
+                            </div>
+                            <div class="sec-item">
+                                <i data-lucide="check-circle" class="text-success"></i>
+                                <div>
+                                    <strong>Deterministic & Auditable:</strong>
+                                    <p>Rule-based mathematical models prevent non-deterministic hallucination risks.</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card" style="margin-top: 1.5rem;">
+                    <div class="card-header">
+                        <div class="card-title">
+                            <i data-lucide="alert-triangle"></i>
+                            <h3>Known Risk Register & Mitigations</h3>
+                        </div>
+                    </div>
+                    <div class="table-responsive">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>Risk Identifier</th>
+                                    <th>Description</th>
+                                    <th>Severity</th>
+                                    <th>Mitigation Mechanism</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                <tr>
+                                    <td><strong>RISK-01</strong></td>
+                                    <td>Confusion between simulated and real money</td>
+                                    <td><span class="badge badge-warning">Medium</span></td>
+                                    <td>Persistent simulated sandbox badges, clear UI disclaimers on every view.</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>RISK-02</strong></td>
+                                    <td>Over-aggressive budget recommendations causing hardship</td>
+                                    <td><span class="badge badge-warning">Medium</span></td>
+                                    <td>3-tier choice (Conservative, Balanced, Aggressive) with feasibility ratings and category caps.</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>RISK-03</strong></td>
+                                    <td>False positive anomaly flags on seasonal expenses</td>
+                                    <td><span class="badge badge-info">Low</span></td>
+                                    <td>Category-normalized Z-scores and adjustable threshold parameters.</td>
+                                </tr>
+                                <tr>
+                                    <td><strong>RISK-04</strong></td>
+                                    <td>Unauthorized plan execution</td>
+                                    <td><span class="badge badge-danger">High</span></td>
+                                    <td>Staged Sandbox workflow requiring explicit approval action logged to immutable audit records.</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </section>
+        </main>
+    </div>
+
+    <!-- Onboarding Modal Wizard (3 Steps) -->
+    <div class="modal-backdrop" id="modal-onboarding">
+        <div class="modal-card" style="max-width: 550px;">
+            <div class="modal-header">
+                <h3><i data-lucide="sparkles"></i> Welcome! Set Up Your Financial Profile</h3>
+                <button class="modal-close" onclick="closeModal('modal-onboarding')">&times;</button>
+            </div>
+            <form onsubmit="handleOnboardingSubmit(event)">
+                <div class="modal-body">
+                    <div id="ob-step-1" class="ob-step">
+                        <h4 style="margin-bottom: 0.5rem; color: var(--accent-cyan);">Step 1 of 3: Income & Declared Expenses</h4>
+                        <p style="font-size: 0.78rem; color: var(--text-muted); margin-bottom: 1rem;">Declare your regular monthly earnings and estimated living budget.</p>
+                        <div class="form-group">
+                            <label>Monthly Take-Home Income ($)</label>
+                            <input type="number" id="ob-income" class="form-control" value="4000" min="100" step="50" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Estimated Monthly Expenses ($)</label>
+                            <input type="number" id="ob-expense" class="form-control" value="2400" min="0" step="50" required>
+                        </div>
+                        <div style="text-align: right; margin-top: 1rem;">
+                            <button type="button" class="btn btn-primary btn-sm" onclick="goToObStep(2)">Next: Savings Goal →</button>
+                        </div>
+                    </div>
+
+                    <div id="ob-step-2" class="ob-step" style="display: none;">
+                        <h4 style="margin-bottom: 0.5rem; color: var(--accent-cyan);">Step 2 of 3: First Savings Goal</h4>
+                        <p style="font-size: 0.78rem; color: var(--text-muted); margin-bottom: 1rem;">Set your primary savings priority (e.g., Emergency Fund or Travel).</p>
+                        <div class="form-group">
+                            <label>Goal Title</label>
+                            <input type="text" id="ob-goal-title" class="form-control" value="Emergency Safety Fund" required>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Target Amount ($)</label>
+                                <input type="number" id="ob-goal-target" class="form-control" value="12000" min="100" step="100" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Current Saved ($)</label>
+                                <input type="number" id="ob-goal-current" class="form-control" value="3000" min="0" step="50" required>
+                            </div>
+                        </div>
+                        <div class="form-group">
+                            <label>Target Deadline</label>
+                            <input type="date" id="ob-goal-date" class="form-control" required>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; margin-top: 1rem;">
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="goToObStep(1)">← Back</button>
+                            <button type="button" class="btn btn-primary btn-sm" onclick="goToObStep(3)">Next: Risk & Strategy →</button>
+                        </div>
+                    </div>
+
+                    <div id="ob-step-3" class="ob-step" style="display: none;">
+                        <h4 style="margin-bottom: 0.5rem; color: var(--accent-cyan);">Step 3 of 3: Risk Profile & Preferences</h4>
+                        <p style="font-size: 0.78rem; color: var(--text-muted); margin-bottom: 1rem;">Select your risk tolerance and safety horizon.</p>
+                        <div class="form-group">
+                            <label>Risk Tolerance</label>
+                            <select id="ob-risk" class="form-control">
+                                <option value="conservative">Conservative (Capital preservation, ~3% return)</option>
+                                <option value="moderate" selected>Moderate (Balanced growth, ~5% return)</option>
+                                <option value="aggressive">Aggressive (High growth, ~8% return)</option>
+                            </select>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Emergency Target</label>
+                                <select id="ob-emergency" class="form-control">
+                                    <option value="3">3 Months</option>
+                                    <option value="6" selected>6 Months</option>
+                                    <option value="12">12 Months</option>
+                                </select>
+                            </div>
+                            <div class="form-group">
+                                <label>Annual Inflation</label>
+                                <input type="number" id="ob-inflation" class="form-control" step="0.005" value="0.03">
+                            </div>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; margin-top: 1rem;">
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="goToObStep(2)">← Back</button>
+                            <button type="submit" class="btn btn-primary btn-sm"><i data-lucide="check"></i> Complete Setup</button>
+                        </div>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Add Transaction -->
+    <div class="modal-backdrop" id="modal-add-tx">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3><i data-lucide="plus-circle"></i> Add Simulated Transaction</h3>
+                <button class="modal-close" onclick="closeModal('modal-add-tx')">&times;</button>
+            </div>
+            <form onsubmit="handleAddTransaction(event)">
+                <div class="modal-body">
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Transaction Type</label>
+                            <select id="new-tx-type" class="form-control" onchange="updateCategoryDropdown()">
+                                <option value="expense">Expense</option>
+                                <option value="income">Income</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Category</label>
+                            <select id="new-tx-category" class="form-control" required></select>
+                        </div>
+                    </div>
+                    <div class="form-group">
+                        <label>Amount ($)</label>
+                        <input type="number" id="new-tx-amount" class="form-control" step="1" min="1" required placeholder="e.g. 150">
+                    </div>
+                    <div class="form-group">
+                        <label>Description</label>
+                        <input type="text" id="new-tx-desc" class="form-control" required placeholder="e.g. Weekend grocery restock">
+                    </div>
+                    <div class="form-group">
+                        <label>Date</label>
+                        <input type="date" id="new-tx-date" class="form-control" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('modal-add-tx')">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Save Transaction</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Add Custom Category -->
+    <div class="modal-backdrop" id="modal-add-category">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3><i data-lucide="folder-plus"></i> Create Custom Category</h3>
+                <button class="modal-close" onclick="closeModal('modal-add-category')">&times;</button>
+            </div>
+            <form onsubmit="handleAddCategory(event)">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label>Category Name</label>
+                        <input type="text" id="cat-name" class="form-control" required placeholder="e.g. Pet Care, Education, Investments">
+                    </div>
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label>Type</label>
+                            <select id="cat-type" class="form-control">
+                                <option value="expense">Expense</option>
+                                <option value="income">Income</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Classification</label>
+                            <select id="cat-essential" class="form-control">
+                                <option value="1">Essential (Needs)</option>
+                                <option value="0">Discretionary (Wants)</option>
+                            </select>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('modal-add-category')">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Create Category</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- Modal: Create Sandbox Proposal -->
+    <div class="modal-backdrop" id="modal-new-proposal">
+        <div class="modal-card">
+            <div class="modal-header">
+                <h3><i data-lucide="box"></i> Create Sandbox Budget Proposal</h3>
+                <button class="modal-close" onclick="closeModal('modal-new-proposal')">&times;</button>
+            </div>
+            <form onsubmit="handleCreateCustomProposal(event)">
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label>Proposal Title</label>
+                        <input type="text" id="prop-title" class="form-control" required placeholder="e.g. Cut Dining & Reallocate to Goal">
+                    </div>
+                    <div class="form-group">
+                        <label>Action Type</label>
+                        <select id="prop-action-type" class="form-control">
+                            <option value="BUDGET_REALLOCATION">Budget Reallocation</option>
+                            <option value="EXPENSE_REDUCTION">Expense Reduction</option>
+                            <option value="GOAL_ADJUSTMENT">Goal Monthly Adjustment</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label>Description & Rationale</label>
+                        <textarea id="prop-desc" class="form-control" rows="2" required placeholder="Explain why this change is suggested..."></textarea>
+                    </div>
+                    <div class="form-group">
+                        <label>Projected Monthly Savings Increase ($)</label>
+                        <input type="number" id="prop-savings-delta" class="form-control" value="200" step="10" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" onclick="closeModal('modal-new-proposal')">Cancel</button>
+                    <button type="submit" class="btn btn-primary">Stage Proposal</button>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <div id="toast-container" class="toast-container"></div>
+
+    <script src="/static/js/charts.js"></script>
+    <script src="/static/js/app.js"></script>
+</body>
+</html>
