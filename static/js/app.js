@@ -47,6 +47,65 @@ async function apiFetch(url, options = {}) {
             showToast(msg, 'error');
             throw new Error(msg);
         }
+        const data = await res.json();
+        // Auto-refresh on mutating calls except excluded endpoints
+        const mutating = ['POST','PUT','DELETE','PATCH'].includes((options.method || 'GET').toUpperCase());
+        const exclude = [/^\/api\/simulate/, /^\/api\/goals\/calculate-plans/, /^\/api\/quant\//, /^\/api\/transactions\/scan-anomalies/];
+        if (mutating && url.startsWith('/api/') && !exclude.some(r=>r.test(url))) {
+            scheduleRefresh();
+        }
+        return data;
+    } catch (err) {
+        console.error('API Error:', err);
+        throw err;
+    }
+}
+
+// Debounced refresh to sync all tabs
+let _refreshTimer = null;
+function scheduleRefresh(){
+    if(_refreshTimer) clearTimeout(_refreshTimer);
+    _refreshTimer = setTimeout(refreshAll, 150);
+}
+async function refreshAll(){
+    await loadDashboardData();
+    // reload profile-dependent fields
+    await loadProfileIntoSettings();
+    // mark other tabs stale for future activation
+    staleTabs = new Set(['tab-planner','tab-simulator','tab-progress','tab-sandbox','tab-transactions','tab-audit','tab-settings']);
+    // if a stale tab is currently visible, reload it now
+    const active = document.querySelector('.tab-pane.active');
+    if(active){
+        const id = active.id.replace('tab-','');
+        if(staleTabs.has(active.id)){
+            switchTab(active.id);
+            staleTabs.delete(active.id);
+        }
+    }
+}
+
+// KPI click-to-edit handler
+document.addEventListener('click', e=>{
+    const card = e.target.closest('.kpi-card');
+    if(!card) return;
+    const kpi = card.dataset.kpi;
+    if(!kpi) return;
+    // Open edit modal (implementation placeholder)
+    openKpiEditModal(kpi);
+});
+
+    options.headers = options.headers || {};
+    options.headers['X-User-Role'] = currentRole;
+    options.headers['Content-Type'] = options.headers['Content-Type'] || 'application/json';
+
+    try {
+        const res = await fetch(url, options);
+        if (!res.ok) {
+            const errData = await res.json().catch(() => ({}));
+            const msg = errData.detail || errData.error || `Server error (${res.status})`;
+            showToast(msg, 'error');
+            throw new Error(msg);
+        }
         return await res.json();
     } catch (err) {
         console.error('API Error:', err);

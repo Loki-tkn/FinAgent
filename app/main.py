@@ -57,7 +57,20 @@ app.include_router(admin.router)
 # Mount static files
 STATIC_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "static")
 os.makedirs(STATIC_DIR, exist_ok=True)
-app.mount("/static", StaticFiles(directory=STATIC_DIR), name="static")
+# Development static files with no-cache
+class NoCacheStaticFiles(StaticFiles):
+    async def __call__(self, scope, receive, send):
+        async def send_wrapper(message):
+            if message.get("type") == "http.response.start":
+                headers = dict(message.get("headers", []))
+                # Add Cache-Control no-store header
+                headers[b"cache-control"] = b"no-store"
+                # Rebuild headers list
+                message["headers"] = list(headers.items())
+            await send(message)
+        await super().__call__(scope, receive, send_wrapper)
+
+app.mount("/static", NoCacheStaticFiles(directory=STATIC_DIR), name="static")
 
 @app.get("/")
 def serve_index():

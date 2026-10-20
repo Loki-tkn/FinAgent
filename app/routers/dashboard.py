@@ -7,6 +7,7 @@ from app.services.health_score import calculate_financial_health_score
 from app.services.metrics import monthly_avg_expense, history_series, effective_income
 from app.security import get_current_role
 from app.services.assumptions import goal_assumptions
+from app.services.goal_prob import goal_success_probability
 from app.services.quant import (
     real_target,
     monte_carlo_goal,
@@ -171,35 +172,17 @@ def get_dashboard_summary(role: str = Depends(get_current_role)) -> Dict[str, An
         primary_goal = next((g for g in goals if g.get("status") == "In Progress"), goals[0] if goals else None)
         if primary_goal:
             try:
-                g_target = float(primary_goal["target_amount"])
-                g_current = float(primary_goal["current_savings"])
-                g_contrib = float(primary_goal["monthly_contribution"]) if primary_goal.get("monthly_contribution") is not None else 0.0
-                g_dt = datetime.strptime(primary_goal["target_date"], "%Y-%m-%d")
-                g_months = max(1, (g_dt.year - now.year) * 12 + (g_dt.month - now.month))
-
-                g_ret, g_vol, _ = goal_assumptions(primary_goal["title"], g_months, {"expected_return": ann_return, "volatility": ann_vol, "inflation": ann_inf})
-
-                if is_low_data or len(surplus_history) < 2:
-                    mean_surplus = monthly_surplus
-                    hist_std = 0.15 * mean_surplus if mean_surplus > 0 else 100.0
-                else:
-                    mean_surplus = float(np.mean(surplus_history))
-                    hist_std = float(np.std(surplus_history, ddof=1)) if len(surplus_history) > 1 else 0.15 * mean_surplus
-
-                if g_contrib > 0:
-                    dep_mean = g_contrib
-                    scale = min(1.0, g_contrib / mean_surplus) if mean_surplus > 0 else 1.0
-                    dep_std = max(hist_std * scale, 0.10 * g_contrib)
-                else:
-                    dep_mean = max(0.0, mean_surplus)
-                    dep_std = max(10.0, hist_std)
-
-                adj_g_target = real_target(g_target, ann_inf, g_months)
-                mc = monte_carlo_goal(
-                    g_current, adj_g_target, g_months, [], g_ret, g_vol, n=10000,
-                    custom_mean=dep_mean, custom_std=dep_std
+                prof_dict = {"expected_return": ann_return, "volatility": ann_vol, "inflation": ann_inf, "est_monthly_expense": est_monthly_exp}
+                g_res = goal_success_probability(
+                    primary_goal,
+                    prof_dict,
+                    effective_inc,
+                    monthly_surplus,
+                    surplus_history,
+                    is_low_data,
+                    n=10000
                 )
-                goal_prob = mc["prob_success"]
+                goal_prob = g_res["prob_success"]
             except Exception:
                 goal_prob = None
 
