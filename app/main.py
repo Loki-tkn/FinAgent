@@ -1,5 +1,14 @@
 import os
 from contextlib import asynccontextmanager
+
+try:
+    from dotenv import load_dotenv
+    load_dotenv()
+    if not os.getenv("OPENROUTER_API_KEY"):
+        load_dotenv(".env.example")
+except Exception:
+    pass
+
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
@@ -19,10 +28,24 @@ from app.routers import (
     budgets,
     recurring
 )
+from app.routers.copilot import router as copilot_router
+from app.copilot.state import context_engine
+from app.copilot.nl_engine import is_openrouter_configured, get_openrouter_model
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     init_db()
+    # Warm-up copilot context from persisted DB events (non-blocking best-effort)
+    try:
+        loaded = context_engine.load_recent_from_db(n_per_lane=50)
+        print(f"[Copilot] Context engine warmed up — {loaded} event(s) loaded from DB.")
+    except Exception as exc:
+        print(f"[Copilot] Context engine warm-up skipped: {exc}")
+
+    if is_openrouter_configured():
+        print(f"[Copilot] 🧠 Neural LLM ACTIVE via OpenRouter — Model: '{get_openrouter_model()}'")
+    else:
+        print("[Copilot] ⚙️ OpenRouter unconfigured — running in deterministic rule-based mode.")
     yield
 
 app = FastAPI(
@@ -53,6 +76,7 @@ app.include_router(simulation.router)
 app.include_router(sandbox.router)
 app.include_router(audit.router)
 app.include_router(admin.router)
+app.include_router(copilot_router)
 
 # Mount static files
 STATIC_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "static")

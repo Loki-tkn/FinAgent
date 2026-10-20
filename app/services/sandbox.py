@@ -138,6 +138,9 @@ def build_discretionary_proposal(conn: sqlite3.Connection, user_id: int = 1) -> 
     if total_cut <= 0:
         raise ValueError("No discretionary savings identified.")
 
+    cursor.execute("SELECT expected_return, volatility, inflation FROM users WHERE id = ?", (user_id,))
+    u_row = cursor.fetchone()
+
     profile = {
         "expected_return": float(u_row["expected_return"]) if u_row and u_row["expected_return"] is not None else 0.05,
         "volatility": float(u_row["volatility"]) if u_row and u_row["volatility"] is not None else 0.10,

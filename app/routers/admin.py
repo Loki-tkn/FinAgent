@@ -3,6 +3,8 @@ from typing import Dict, Any
 from app.database import get_db_connection, clear_user_data, seed_demo_data
 from app.security import require_role
 from app.services.audit import record_audit_log
+from app.copilot.hooks import emit_exec_log
+from app.copilot.state import ContextSeverity
 
 router = APIRouter(prefix="/api/admin", tags=["Admin & System"])
 
@@ -23,6 +25,17 @@ def load_demo_data(role: str = Depends(require_role("Admin"))):
         status="SUCCESS",
         details="Admin loaded clean 12-month USD demo financial dataset"
     )
+
+    # Pipeline Hook: Emit EXEC_LOG (Demo data load execution)
+    emit_exec_log(
+        log={
+            "action": "ADMIN_LOAD_DEMO_DATA",
+            "dataset": "12_months_usd",
+            "executed_by_role": role,
+        },
+        source="system",
+    )
+
     return {"message": "Demo data loaded successfully."}
 
 @router.post("/reset-demo-data")

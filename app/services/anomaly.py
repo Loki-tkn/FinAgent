@@ -3,6 +3,8 @@ import numpy as np
 from typing import List, Dict, Any
 from app.database import get_db_connection
 from app.services.quant import robust_anomalies
+from app.copilot.hooks import emit_risk_metric
+from app.copilot.state import ContextSeverity
 
 MIN_SAMPLES = 5
 
@@ -163,6 +165,21 @@ def detect_spending_anomalies(user_id: int = 1, threshold_z: float = 3.5, persis
 
     severity_rank = {"HIGH": 0, "MEDIUM": 1, "LOW": 2}
     anomalies.sort(key=lambda x: (severity_rank.get(x["severity"], 3), x["date"]))
+
+    if anomalies:
+        has_high = any(a.get("severity") == "HIGH" for a in anomalies)
+        emit_risk_metric(
+            metrics={
+                "metric_type": "SPENDING_ANOMALIES_EVALUATION",
+                "user_id": user_id,
+                "total_scanned": len(expenses),
+                "anomalies_detected": len(anomalies),
+                "high_severity_count": sum(1 for a in anomalies if a.get("severity") == "HIGH"),
+                "top_anomalies": anomalies[:3],
+            },
+            severity=ContextSeverity.WARNING if has_high else ContextSeverity.INFO,
+            source="agent",
+        )
 
     if eligible_count == 0 and len(expenses) > 0:
         msg = f"Scanned {len(expenses)} transactions. No category has {MIN_SAMPLES}+ samples for z-score analysis."

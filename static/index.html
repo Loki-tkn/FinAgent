@@ -14,7 +14,6 @@
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="/static/css/style.css">
 </head>
-12:26 PM
 
 <body class="dark-theme">
     <div class="app-layout">
@@ -77,6 +76,13 @@
                 <button class="nav-item" data-tab="tab-security" id="nav-security">
                     <i data-lucide="shield-check"></i>
                     <span>Security & Docs</span>
+                </button>
+                <button class="copilot-nav-btn" id="nav-copilot"
+                    style="border: 1px solid rgba(6, 182, 212, 0.35); background: rgba(6, 182, 212, 0.1); margin-top: 0.5rem;">
+                    <i data-lucide="sparkles" style="color: var(--accent-cyan);"></i>
+                    <span style="color: #fff; font-weight: 600;">Copilot AI Chat</span>
+                    <span class="nav-badge"
+                        style="background: rgba(6, 182, 212, 0.25); color: var(--accent-cyan); border: 1px solid var(--accent-cyan);">HITL</span>
                 </button>
             </nav>
 
@@ -1242,8 +1248,121 @@
 
     <div id="toast-container" class="toast-container"></div>
 
+    <!-- ============================================================== -->
+    <!-- FinAgent Copilot - Floating Chat Bubble & Slide-In Panel       -->
+    <!-- ============================================================== -->
+    <!-- Floating Chat Bubble Button -->
+    <button id="copilot-bubble-btn" class="copilot-bubble-btn" aria-label="Toggle FinAgent Copilot Chat"
+        title="FinAgent Copilot">
+        <div class="bubble-icon-wrap">
+            <svg class="bubble-icon-open" viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor"
+                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path
+                    d="m12 3-1.912 5.813a2 2 0 0 1-1.275 1.275L3 12l5.813 1.912a2 2 0 0 1 1.275 1.275L12 21l1.912-5.813a2 2 0 0 1 1.275-1.275L21 12l-5.813-1.912a2 2 0 0 1-1.275-1.275L12 3Z" />
+            </svg>
+            <svg class="bubble-icon-close" viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor"
+                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M18 6 6 18" />
+                <path d="m6 6 12 12" />
+            </svg>
+        </div>
+        <span class="bubble-status-dot ready" title="Copilot Online"></span>
+        <span class="bubble-badge" id="copilot-bubble-badge" style="display: none;">0</span>
+        <div class="bubble-tooltip">
+            <span>Ask Copilot AI</span>
+        </div>
+    </button>
+
+    <!-- Slide-In Chat Panel -->
+    <div id="copilot-panel" class="copilot-panel" aria-hidden="true">
+        <!-- Panel Header -->
+        <div class="copilot-header">
+            <div class="copilot-header-brand">
+                <div class="copilot-avatar">
+                    <i data-lucide="bot"></i>
+                    <span class="copilot-status-indicator ready" id="copilot-status-indicator" title="Connected"></span>
+                </div>
+                <div class="copilot-title-group">
+                    <div class="copilot-title-row">
+                        <h3>FinAgent Copilot</h3>
+                        <span class="badge-ai-copilot">HITL AI</span>
+                    </div>
+                    <div class="copilot-subtitle">
+                        <span id="copilot-conn-status" class="status-text">Connecting...</span>
+                        <span class="separator">•</span>
+                        <span class="session-tag" id="copilot-session-display">session: default</span>
+                    </div>
+                </div>
+            </div>
+            <div class="copilot-header-actions">
+                <button class="copilot-icon-btn kill-switch-mini-btn" id="copilot-btn-killswitch"
+                    title="Emergency Kill Switch (Halt Agents)" aria-label="Emergency Kill Switch">
+                    <i data-lucide="shield-alert"></i>
+                </button>
+                <button class="copilot-icon-btn" id="copilot-btn-clear" title="Clear chat messages"
+                    aria-label="Clear chat">
+                    <i data-lucide="rotate-ccw"></i>
+                </button>
+                <button class="copilot-icon-btn copilot-close-btn" id="copilot-btn-close" title="Close chat panel"
+                    aria-label="Close panel">
+                    <i data-lucide="x"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Safety Banner (Kill Switch Active) -->
+        <div id="copilot-safety-banner" class="copilot-safety-banner" style="display: none;">
+            <i data-lucide="alert-triangle"></i>
+            <span id="copilot-safety-msg">Agent activity halted</span>
+        </div>
+
+        <!-- Chat Messages Container -->
+        <div class="copilot-messages" id="copilot-messages">
+            <!-- Dynamic Messages Appended by copilot.js -->
+        </div>
+
+        <!-- Quick Suggestions Track -->
+        <div class="copilot-suggestions" id="copilot-suggestions">
+            <div class="suggestions-label"><i data-lucide="compass"></i> Quick Queries:</div>
+            <div class="suggestions-track">
+                <button type="button" class="suggestion-chip" data-query="What is my financial health score?">💡 Health
+                    Score</button>
+                <button type="button" class="suggestion-chip" data-query="Show me spending anomalies">🔍
+                    Anomalies</button>
+                <button type="button" class="suggestion-chip" data-query="How are my savings goals tracking?">🎯 Goals
+                    Status</button>
+                <button type="button" class="suggestion-chip"
+                    data-query="Show agent reasoning chain-of-thought traces">🧠 Reasoning Traces</button>
+                <button type="button" class="suggestion-chip" data-query="What are my risk metrics?">🛡️ Risk
+                    Metrics</button>
+                <button type="button" class="suggestion-chip" data-query="Break down my monthly budget">📊 Monthly
+                    Budget</button>
+            </div>
+        </div>
+
+        <!-- Input Area -->
+        <div class="copilot-input-area">
+            <form id="copilot-form" class="copilot-form">
+                <div class="copilot-input-wrap">
+                    <textarea id="copilot-input" class="copilot-input"
+                        placeholder="Ask Copilot (health score, anomalies, reasoning)..." rows="1"
+                        maxlength="2000"></textarea>
+                    <button type="submit" id="copilot-send-btn" class="copilot-send-btn" title="Send message" disabled>
+                        <i data-lucide="send"></i>
+                    </button>
+                </div>
+                <div class="copilot-input-footer">
+                    <span><kbd>Enter</kbd> to send, <kbd>Shift+Enter</kbd> newline</span>
+                    <span class="role-indicator"><i data-lucide="shield-check"></i> <span
+                            id="copilot-role-text">User</span></span>
+                </div>
+            </form>
+        </div>
+    </div>
+
     <script src="/static/js/charts.js"></script>
     <script src="/static/js/app.js"></script>
+    <script src="/static/js/copilot.js"></script>
 </body>
 
 </html>

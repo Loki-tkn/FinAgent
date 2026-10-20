@@ -84,33 +84,10 @@ async function refreshAll(){
     }
 }
 
-// KPI click-to-edit handler
-document.addEventListener('click', e=>{
-    const card = e.target.closest('.kpi-card');
-    if(!card) return;
-    const kpi = card.dataset.kpi;
-    if(!kpi) return;
-    // Open edit modal (implementation placeholder)
-    openKpiEditModal(kpi);
-});
-
-    options.headers = options.headers || {};
-    options.headers['X-User-Role'] = currentRole;
-    options.headers['Content-Type'] = options.headers['Content-Type'] || 'application/json';
-
-    try {
-        const res = await fetch(url, options);
-        if (!res.ok) {
-            const errData = await res.json().catch(() => ({}));
-            const msg = errData.detail || errData.error || `Server error (${res.status})`;
-            showToast(msg, 'error');
-            throw new Error(msg);
-        }
-        return await res.json();
-    } catch (err) {
-        console.error('API Error:', err);
-        throw err;
-    }
+// KPI click-to-edit handler (placeholder — extend as needed)
+function openKpiEditModal(kpi) {
+    // No-op stub; implement a KPI edit modal here if desired
+    console.info('KPI card clicked:', kpi);
 }
 
 function switchTab(tabId) {
