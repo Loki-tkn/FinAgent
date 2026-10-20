@@ -30,7 +30,8 @@ def simulate_financial_decision(
         cursor.execute("SELECT id, title, target_amount, current_savings, monthly_contribution, target_date FROM goals WHERE id = ?", (goal_id,))
     else:
         cursor.execute("SELECT id, title, target_amount, current_savings, monthly_contribution, target_date FROM goals WHERE user_id = ? AND status = 'In Progress' ORDER BY id ASC LIMIT 1", (user_id,))
-    goal_row = cursor.fetchone()
+    g_raw = cursor.fetchone()
+    goal_row = dict(g_raw) if g_raw else None
     conn.close()
 
     metrics = monthly_avg_expense(user_id=user_id, exclude_anomalies=True)

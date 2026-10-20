@@ -152,18 +152,52 @@ def init_db(force_reseed: bool = False):
         FOREIGN KEY(user_id) REFERENCES users(id)
     );
 
+    CREATE TABLE IF NOT EXISTS app_meta (
+        key TEXT PRIMARY KEY,
+        value TEXT
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_transactions_user_date ON transactions(user_id, date);
+    CREATE INDEX IF NOT EXISTS idx_transactions_user_type_cat ON transactions(user_id, type, category);
+
     DROP VIEW IF EXISTS effective_transactions;
     CREATE VIEW effective_transactions AS
-    SELECT * FROM transactions t
-    WHERE COALESCE(t.source, 'manual') != 'summary'
-       OR NOT EXISTS (
-           SELECT 1 FROM transactions t2
-           WHERE t2.user_id = t.user_id
-             AND t2.type = t.type
-             AND LOWER(t2.category) = LOWER(t.category)
-             AND substr(t2.date, 1, 7) = substr(t.date, 1, 7)
-             AND COALESCE(t2.source, 'manual') != 'summary'
-       );
+    SELECT id, user_id, category, amount, type, description, date, is_essential, is_anomaly, anomaly_reason, source, created_at
+    FROM transactions
+    WHERE COALESCE(source, 'manual') != 'summary'
+    UNION ALL
+    SELECT
+        s.id,
+        s.user_id,
+        s.category,
+        s.amount - COALESCE((
+            SELECT SUM(d.amount)
+            FROM transactions d
+            WHERE d.user_id = s.user_id
+              AND d.type = s.type
+              AND LOWER(d.category) = LOWER(s.category)
+              AND substr(d.date, 1, 7) = substr(s.date, 1, 7)
+              AND COALESCE(d.source, 'manual') != 'summary'
+        ), 0) AS amount,
+        s.type,
+        s.description,
+        s.date,
+        s.is_essential,
+        s.is_anomaly,
+        s.anomaly_reason,
+        s.source,
+        s.created_at
+    FROM transactions s
+    WHERE s.source = 'summary'
+      AND (s.amount - COALESCE((
+            SELECT SUM(d.amount)
+            FROM transactions d
+            WHERE d.user_id = s.user_id
+              AND d.type = s.type
+              AND LOWER(d.category) = LOWER(s.category)
+              AND substr(d.date, 1, 7) = substr(s.date, 1, 7)
+              AND COALESCE(d.source, 'manual') != 'summary'
+      ), 0)) > 0;
     """)
 
     # Idempotent migration for existing users table
@@ -197,9 +231,11 @@ def init_db(force_reseed: bool = False):
     if "source" not in tx_cols:
         cursor.execute("ALTER TABLE transactions ADD COLUMN source TEXT NOT NULL DEFAULT 'manual'")
 
-    # Ensure default categories exist
-    for cat in DEFAULT_CATEGORIES:
-        cursor.execute("INSERT OR IGNORE INTO categories (name, type, is_essential, icon) VALUES (?, ?, ?, ?)", cat)
+    # Ensure default categories exist only when categories table is empty
+    cursor.execute("SELECT COUNT(*) FROM categories")
+    if cursor.fetchone()[0] == 0:
+        for cat in DEFAULT_CATEGORIES:
+            cursor.execute("INSERT OR IGNORE INTO categories (name, type, is_essential, icon) VALUES (?, ?, ?, ?)", cat)
 
     # Ensure user 1 exists
     cursor.execute("SELECT COUNT(*) FROM users WHERE id = 1")
@@ -215,15 +251,16 @@ def init_db(force_reseed: bool = False):
         clear_user_data(conn)
         seed_demo_data(conn)
     elif os.getenv("SEED_DEMO") == "1":
-        cursor.execute("SELECT COUNT(*) FROM transactions")
-        if cursor.fetchone()[0] == 0:
+        cursor.execute("SELECT value FROM app_meta WHERE key = 'demo_seeded'")
+        row = cursor.fetchone()
+        if not row or row[0] != "1":
             clear_user_data(conn)
             seed_demo_data(conn)
 
     conn.close()
 
 def clear_user_data(conn):
-    """Deletes all data for user 1 and resets profile to blank state."""
+    """Deletes all data for user 1, resets profile, and deletes custom categories."""
     cursor = conn.cursor()
     cursor.execute("DELETE FROM transactions WHERE user_id = 1")
     cursor.execute("DELETE FROM goals WHERE user_id = 1")
@@ -231,6 +268,10 @@ def clear_user_data(conn):
     cursor.execute("DELETE FROM monthly_budgets WHERE user_id = 1")
     cursor.execute("DELETE FROM recurring_rules WHERE user_id = 1")
     cursor.execute("DELETE FROM sqlite_sequence WHERE name IN ('transactions','goals','sandbox_proposals','monthly_budgets','recurring_rules')")
+
+    default_cat_names = [cat[0] for cat in DEFAULT_CATEGORIES]
+    placeholders = ",".join("?" * len(default_cat_names))
+    cursor.execute(f"DELETE FROM categories WHERE name NOT IN ({placeholders})", default_cat_names)
     
     cursor.execute("""
         UPDATE users
@@ -318,24 +359,32 @@ def seed_demo_data(conn):
                 g_amt = round(200.0 * (1 + rng.uniform(-0.10, 0.10)), 2)
                 transactions.append((1, 'Groceries & Food', g_amt, 'expense', f'Weekly Grocery Restock (Week {week+1})', g_date, 1, 0, None))
 
-        for d_idx in range(rng.randint(2, 3)):
-            d_day = min(28, 7 + d_idx * 9)
+        # Dining: 4-5 visits/month at $70-$110
+        for d_idx in range(rng.randint(4, 5)):
+            d_day = min(28, 4 + d_idx * 5 + rng.randint(0, 2))
             d_date = ref_date.replace(day=d_day).strftime("%Y-%m-%d")
             if d_date <= today_str:
-                d_amt = round(rng.uniform(60.0, 90.0), 2)
+                d_amt = round(rng.uniform(70.0, 110.0), 2)
                 transactions.append((1, 'Dining & Cafes', d_amt, 'expense', 'Restaurant & Coffee', d_date, 0, 0, None))
 
+        # Entertainment: $100-$180/month (1-2 events)
+        ent_tot = round(rng.uniform(100.0, 180.0), 2)
         ent_day = min(28, 14)
         ent_date = ref_date.replace(day=ent_day).strftime("%Y-%m-%d")
         if ent_date <= today_str:
-            ent_amt = round(rng.uniform(70.0, 120.0), 2)
-            transactions.append((1, 'Entertainment & Leisure', ent_amt, 'expense', 'Cinema & Weekend Activities', ent_date, 0, 0, None))
+            transactions.append((1, 'Entertainment & Leisure', ent_tot, 'expense', 'Cinema & Weekend Activities', ent_date, 0, 0, None))
 
-        shop_day = min(28, 18)
-        shop_date = ref_date.replace(day=shop_day).strftime("%Y-%m-%d")
-        if shop_date <= today_str:
-            shop_amt = round(rng.uniform(60.0, 110.0), 2)
-            transactions.append((1, 'Shopping & Gadgets', shop_amt, 'expense', 'Clothing & Household Supplies', shop_date, 0, 0, None))
+        # Shopping: $200-$350/month (2-3 purchases)
+        num_shops = rng.randint(2, 3)
+        target_shop_tot = rng.uniform(200.0, 350.0)
+        shop_weights = [rng.uniform(0.5, 1.5) for _ in range(num_shops)]
+        sum_w = sum(shop_weights)
+        for s_idx, w in enumerate(shop_weights):
+            shop_day = min(28, 8 + s_idx * 8 + rng.randint(0, 3))
+            shop_date = ref_date.replace(day=shop_day).strftime("%Y-%m-%d")
+            if shop_date <= today_str:
+                shop_amt = round(target_shop_tot * (w / sum_w), 2)
+                transactions.append((1, 'Shopping & Gadgets', shop_amt, 'expense', 'Clothing & Household Supplies', shop_date, 0, 0, None))
 
     # 2 High-value transactions for anomaly detection
     ipad_date = (base_date - timedelta(days=12)).strftime("%Y-%m-%d")
@@ -351,25 +400,30 @@ def seed_demo_data(conn):
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     """, transactions)
 
-    proposal_payload = json.dumps({
-        "goal_id": first_goal_id,
-        "category_adjustments": {
-            "Dining & Cafes": {"current": 450, "proposed": 200, "delta": -250},
-            "Shopping & Gadgets": {"current": 400, "proposed": 100, "delta": -300},
-            "Entertainment & Leisure": {"current": 200, "proposed": 100, "delta": -100}
-        },
-        "total_monthly_savings_increase": 650,
-        "goal_acceleration_months": 2.5
-    })
+    conn.commit()
 
-    cursor.execute("""
-        INSERT INTO sandbox_proposals (user_id, title, action_type, description, impact_summary, projected_savings_delta, status, payload_json)
-        VALUES
-        (1, 'Discretionary Spending Optimization Plan', 'BUDGET_REALLOCATION',
-         'AI Agent detected $650/month in non-essential dining and shopping. Propose reallocating this to Emergency Fund goal.',
-         '+$650/month savings boost | Accelerates Emergency Fund target date by 2.5 months',
-         650, 'PENDING', ?)
-    """, (proposal_payload,))
+    # Build seed proposal with the SAME logic as POST /api/sandbox/generate
+    from app.services.sandbox import build_discretionary_proposal
+    try:
+        p_dict = build_discretionary_proposal(conn, user_id=1)
+        payload_str = json.dumps(p_dict["payload"])
+        cursor.execute("""
+            INSERT INTO sandbox_proposals (user_id, title, action_type, description, impact_summary, projected_savings_delta, status, payload_json)
+            VALUES (?, ?, ?, ?, ?, ?, 'PENDING', ?)
+        """, (
+            1,
+            p_dict["title"],
+            p_dict["action_type"],
+            p_dict["description"],
+            p_dict["impact_summary"],
+            p_dict["projected_savings_delta"],
+            payload_str
+        ))
+    except Exception as e:
+        print(f"Warning: could not build seed proposal: {e}")
+
+    # Set demo_seeded marker in app_meta
+    cursor.execute("INSERT OR REPLACE INTO app_meta (key, value) VALUES ('demo_seeded', '1')")
 
     cursor.execute("""
         INSERT INTO audit_logs (timestamp, user_role, action_type, resource, status, details, ip_address) VALUES

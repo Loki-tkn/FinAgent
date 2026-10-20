@@ -92,100 +92,25 @@ def generate_proposal(role: str = Depends(require_role("User"))):
         except (json.JSONDecodeError, TypeError):
             continue
 
-    # Fetch category essentiality map
-    cursor.execute("SELECT name, is_essential FROM categories")
-    cat_ess_map = {r["name"].lower(): bool(r["is_essential"]) for r in cursor.fetchall()}
-    conn.close()
+    from app.services.sandbox import build_discretionary_proposal
+    try:
+        p_dict = build_discretionary_proposal(conn, user_id=user_id)
+    except ValueError as e:
+        conn.close()
+        raise HTTPException(status_code=422, detail=str(e))
+    finally:
+        conn.close()
 
-    from app.services.planner import generate_goal_plans, _nper, calculate_months_between
-    from app.services.assumptions import goal_assumptions
-    from app.services.quant import real_target
-
-    plans_data = generate_goal_plans(
-        target_amount=float(goal["target_amount"]),
-        current_savings=float(goal["current_savings"]),
-        target_date_str=goal["target_date"],
-        monthly_income=monthly_income,
-        user_id=user_id,
-        goal_id=goal["id"],
-        goal_title=goal["title"]
-    )
-
-    plans = plans_data.get("plans", [])
-    balanced_plan = next((p for p in plans if p.get("plan_name") == "Balanced" or p.get("name") == "Balanced"), plans[0] if plans else None)
-
-    adjustments = (balanced_plan.get("adjustments") or balanced_plan.get("spending_adjustments") or []) if balanced_plan else []
-    if not balanced_plan or not adjustments:
-        raise HTTPException(status_code=422, detail="Unable to generate spending cuts from financial plan.")
-
-    # Discretionary cuts = adjustments whose category is non-essential (categories.is_essential=0 or "Discretionary Wants"), NEVER essentials
-    disc_cuts = []
-    for adj in adjustments:
-        cat_name = adj.get("category", "").strip()
-        is_ess = cat_ess_map.get(cat_name.lower(), True)
-        if cat_name == "Discretionary Wants" or not is_ess:
-            disc_cuts.append(adj)
-
-    disc_cuts.sort(key=lambda x: x["monthly_saved"], reverse=True)
-    top_3 = disc_cuts[:3]
-
-    total_cut = round(sum(item["monthly_saved"] for item in top_3), 2)
-    if total_cut <= 0:
-        raise HTTPException(status_code=422, detail="No discretionary savings identified.")
-
-    profile = {
-        "expected_return": float(u_row["expected_return"]) if u_row and u_row["expected_return"] is not None else 0.05,
-        "volatility": float(u_row["volatility"]) if u_row and u_row["volatility"] is not None else 0.10,
-        "inflation": float(u_row["inflation"]) if u_row and u_row["inflation"] is not None else 0.03,
-    }
-    months_rem = calculate_months_between(goal["target_date"])
-    exp_ret, _, ann_inf = goal_assumptions(goal["title"], months_rem, profile)
-    adj_target = real_target(float(goal["target_amount"]), ann_inf, months_rem)
-    r_monthly = exp_ret / 12.0
-
-    curr_savings = float(goal["current_savings"])
-    orig_contrib = float(goal["monthly_contribution"]) if goal["monthly_contribution"] is not None else 0.0
-    if orig_contrib <= 0:
-        orig_contrib = max(0.0, float(plans_data.get("current_monthly_surplus", 0.0)))
-
-    new_contrib = orig_contrib + total_cut
-
-    orig_nper = _nper(curr_savings, orig_contrib, adj_target, r_monthly)
-    new_nper = _nper(curr_savings, new_contrib, adj_target, r_monthly)
-
-    if orig_nper is not None and new_nper is not None and orig_nper > new_nper:
-        accel = round(orig_nper - new_nper, 1)
-        impact_summary = (
-            f"Accelerates '{goal['title']}' by {accel:.1f} months (from {orig_nper:.1f} to {new_nper:.1f} months) "
-            f"by redirecting ${total_cut:,.0f}/mo from discretionary spending."
-        )
-    elif new_nper is not None:
-        impact_summary = (
-            f"Enables completing '{goal['title']}' in {new_nper:.1f} months "
-            f"by adding ${total_cut:,.0f}/mo from discretionary spending cuts."
-        )
-    else:
-        impact_summary = f"Adds ${total_cut:,.0f}/mo towards '{goal['title']}'."
-
-    payload = {
-        "goal_id": goal["id"],
-        "goal_title": goal["title"],
-        "cuts": top_3,
-        "total_cut": total_cut,
-        "new_monthly_contribution": new_contrib
-    }
-
-    action_type = "DISCRETIONARY_CUT"
     res = create_sandbox_proposal(
-        title=f"Discretionary Budget Cuts for {goal['title']}",
-        action_type=action_type,
-        description=f"Trim top {len(top_3)} discretionary categories to save ${total_cut:,.0f}/month.",
-        impact_summary=impact_summary,
-        projected_savings_delta=total_cut,
-        payload=payload,
+        title=p_dict["title"],
+        action_type=p_dict["action_type"],
+        description=p_dict["description"],
+        impact_summary=p_dict["impact_summary"],
+        projected_savings_delta=p_dict["projected_savings_delta"],
+        payload=p_dict["payload"],
         user_id=user_id,
         user_role=role,
-        monthly_income=monthly_income
+        monthly_income=p_dict["monthly_income"]
     )
 
     if "error" in res:

@@ -223,12 +223,13 @@ async def import_csv_transactions(
     cat_map = {r["name"].lower(): (r["name"], r["type"], bool(r["is_essential"])) for r in cursor.fetchall()}
 
     cursor.execute("SELECT date, amount, description FROM transactions WHERE user_id = ?", (user_id,))
-    existing_set = {(r["date"], float(r["amount"]), r["description"].strip().lower()) for r in cursor.fetchall()}
+    from collections import Counter
+    db_counts = Counter((r["date"], float(r["amount"]), r["description"].strip().lower()) for r in cursor.fetchall())
+    batch_counts = Counter()
 
     valid_rows = []
     errors = []
     duplicates_count = 0
-    seen_in_batch = set()
 
     for idx, r in enumerate(rows, start=1):
         raw_date = (r.get(date_col) or "").strip()
@@ -259,9 +260,13 @@ async def import_csv_transactions(
             errors.append({"row": idx, "error": f"Invalid amount '{raw_amt}'"})
             continue
 
-        if raw_type in ["income", "expense"]:
-            tx_type = raw_type
-            tx_amt = abs(amt_val)
+        if raw_type:
+            if raw_type in ["income", "expense"]:
+                tx_type = raw_type
+                tx_amt = abs(amt_val)
+            else:
+                errors.append({"row": idx, "error": f"Invalid type '{raw_type}' (expected income or expense)"})
+                continue
         else:
             if amt_val < 0:
                 tx_type = "expense"
@@ -285,11 +290,14 @@ async def import_csv_transactions(
             continue
 
         dup_key = (parsed_date, tx_amt, raw_desc.lower())
-        if dup_key in existing_set or dup_key in seen_in_batch:
+        current_seen = batch_counts[dup_key]
+        already_in_db = db_counts[dup_key]
+        if current_seen < already_in_db:
             duplicates_count += 1
+            batch_counts[dup_key] += 1
             continue
 
-        seen_in_batch.add(dup_key)
+        batch_counts[dup_key] += 1
         valid_rows.append({
             "date": parsed_date,
             "amount": tx_amt,
@@ -328,7 +336,7 @@ async def import_csv_transactions(
 
     preview = [
         {"date": r["date"], "description": r["description"], "amount": r["amount"], "category": r["category"], "type": r["type"]}
-        for r in valid_rows[:5]
+        for r in valid_rows[:10]
     ]
 
     return CSVImportResponse(
@@ -405,7 +413,15 @@ def update_category(
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Category not found")
 
     old_name = existing["name"]
-    new_name = cat.name.strip() if cat.name else old_name
+    if cat.name is not None:
+        stripped = cat.name.strip()
+        if not stripped:
+            conn.close()
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail="Category name cannot be empty.")
+        new_name = stripped
+    else:
+        new_name = old_name
+
     new_is_essential = int(cat.is_essential) if cat.is_essential is not None else existing["is_essential"]
 
     try:
@@ -414,6 +430,8 @@ def update_category(
             cursor.execute("UPDATE transactions SET category = ? WHERE category = ?", (new_name, old_name))
             cursor.execute("UPDATE monthly_budgets SET category = ? WHERE category = ?", (new_name, old_name))
             cursor.execute("UPDATE recurring_rules SET category = ? WHERE category = ?", (new_name, old_name))
+        if cat.is_essential is not None:
+            cursor.execute("UPDATE transactions SET is_essential = ? WHERE LOWER(category) = LOWER(?)", (new_is_essential, new_name))
         conn.commit()
     except sqlite3.IntegrityError:
         conn.rollback()
@@ -578,6 +596,12 @@ def update_transaction(
         updates.append("description = ?")
         params.append(tx.description)
     if tx.date is not None:
+        from datetime import date as dt_date
+        try:
+            dt_date.fromisoformat(tx.date)
+        except Exception:
+            conn.close()
+            raise HTTPException(status_code=status.HTTP_422_UNPROCESSABLE_ENTITY, detail=f"Invalid date format '{tx.date}'. Must be valid YYYY-MM-DD.")
         updates.append("date = ?")
         params.append(tx.date)
 

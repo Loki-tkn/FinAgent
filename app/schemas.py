@@ -310,9 +310,11 @@ class TransactionUpdate(BaseModel):
     def validate_date_format(cls, v: str) -> str:
         if v is None:
             return v
-        import re
-        if not re.match(r'^\d{4}-\d{2}-\d{2}$', v):
-            raise ValueError('Date must be in YYYY-MM-DD format')
+        from datetime import date
+        try:
+            date.fromisoformat(v)
+        except Exception:
+            raise ValueError('Date must be a valid calendar date in YYYY-MM-DD format')
         return v
 
 # --- Goal Updates ---
