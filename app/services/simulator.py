@@ -2,7 +2,7 @@ from typing import Dict, Any, Optional
 from datetime import datetime
 import numpy as np
 from app.database import get_db_connection
-from app.services.metrics import monthly_avg_expense, history_series
+from app.services.metrics import monthly_avg_expense, history_series, effective_income
 from app.services.assumptions import goal_assumptions
 from app.services.quant import real_target, monte_carlo_goal
 from app.services.planner import calculate_months_between
@@ -23,11 +23,12 @@ def simulate_financial_decision(
 
     cursor.execute("SELECT monthly_income, expected_return, volatility, inflation, est_monthly_expense FROM users WHERE id = ?", (user_id,))
     user_row = cursor.fetchone()
-    monthly_income = float(user_row["monthly_income"]) if user_row and user_row["monthly_income"] else 0.0
+    inc_info = effective_income(user_id)
+    monthly_income = inc_info["value"]
     prof = dict(user_row) if user_row else {}
 
     if goal_id:
-        cursor.execute("SELECT id, title, target_amount, current_savings, monthly_contribution, target_date FROM goals WHERE id = ?", (goal_id,))
+        cursor.execute("SELECT id, title, target_amount, current_savings, monthly_contribution, target_date FROM goals WHERE id = ? AND user_id = ?", (goal_id, user_id))
     else:
         cursor.execute("SELECT id, title, target_amount, current_savings, monthly_contribution, target_date FROM goals WHERE user_id = ? AND status = 'In Progress' ORDER BY id ASC LIMIT 1", (user_id,))
     g_raw = cursor.fetchone()

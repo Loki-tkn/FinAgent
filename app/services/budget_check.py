@@ -1,5 +1,5 @@
 from typing import Tuple, Optional
-from app.services.metrics import monthly_avg_expense
+from app.services.metrics import monthly_avg_expense, effective_income
 
 
 def contribution_budget_check(conn, user_id: int = 1) -> Tuple[bool, Optional[str]]:
@@ -7,10 +7,8 @@ def contribution_budget_check(conn, user_id: int = 1) -> Tuple[bool, Optional[st
     Checks if sum(monthly_contribution of In Progress goals) > monthly_income - monthly_avg_expense.
     Returns (over_budget: bool, warning: Optional[str]).
     """
+    monthly_income = effective_income(user_id)["value"]
     cursor = conn.cursor()
-    cursor.execute("SELECT monthly_income FROM users WHERE id = ?", (user_id,))
-    u_row = cursor.fetchone()
-    monthly_income = float(u_row["monthly_income"]) if u_row and u_row["monthly_income"] is not None else 0.0
 
     cursor.execute("""
         SELECT SUM(monthly_contribution) FROM goals

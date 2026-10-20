@@ -19,6 +19,10 @@ class ProfileUpdate(BaseModel):
     expected_return: Optional[float] = Field(default=None, ge=0.0, le=1.0)
     volatility: Optional[float] = Field(default=None, ge=0.0, le=1.0)
     currency: Optional[Literal['USD']] = None
+    income_mode: Optional[Literal['auto', 'manual', 'blend']] = None
+    expense_mode: Optional[Literal['auto', 'manual', 'blend']] = None
+    expense_manual: Optional[float] = Field(default=None, ge=0)
+    blend_weight: Optional[float] = Field(default=None, ge=0.0, le=1.0)
 
 class RoleSwitchRequest(BaseModel):
     role: str = Field(..., description="Target role: Viewer, User, or Admin")
@@ -155,6 +159,8 @@ class SimulationRequest(BaseModel):
     frequency: str = Field(default="one_time", description="'one_time' or 'monthly'")
     description: str = Field(default="Simulated Financial Event")
     target_category: Optional[str] = "Discretionary"
+    allocate_pct: float = Field(default=100.0, ge=0.0, le=100.0)
+    pay_from: Literal['goal', 'cash'] = 'goal'
 
     @field_validator('amount')
     @classmethod
@@ -197,6 +203,7 @@ class LoanVsCashResponse(BaseModel):
     better: Literal['loan', 'cash']
     needs_setup: Optional[bool] = False
     low_data: Optional[bool] = False
+    sensitivity: Optional[List[Dict[str, Any]]] = None
 
 class MonteCarloGoalResponse(BaseModel):
     goal_id: int

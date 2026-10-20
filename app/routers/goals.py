@@ -8,6 +8,7 @@ from app.security import get_current_role, require_role
 from app.services.planner import generate_goal_plans
 from app.services.tracker import track_goal_progress
 from app.services.audit import record_audit_log
+from app.services.metrics import effective_income
 
 router = APIRouter(prefix="/api/goals", tags=["Goals & Planner"])
 
@@ -18,7 +19,7 @@ def list_goals(role: str = Depends(get_current_role)):
     conn = get_db_connection()
     cursor = conn.cursor()
     cursor.execute("""
-        SELECT id, user_id, title, target_amount, current_savings, initial_savings, monthly_contribution, target_date, selected_plan, status, notes, created_at
+        SELECT id, user_id, title, target_amount, current_savings, initial_savings, monthly_contribution, target_date, selected_plan, status, notes, goal_type, created_at
         FROM goals
         WHERE user_id = ?
         ORDER BY id ASC
@@ -67,13 +68,7 @@ def calculate_custom_plans(
     Generates 3 customized savings plans (Conservative, Balanced, Aggressive).
     """
     user_id = 1
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT monthly_income FROM users WHERE id = ?", (user_id,))
-    user = cursor.fetchone()
-    conn.close()
-
-    monthly_income = float(user["monthly_income"]) if user else 0.0
+    monthly_income = effective_income(user_id)["value"]
 
     plans = generate_goal_plans(
         target_amount=goal.target_amount,
@@ -96,14 +91,12 @@ def get_plans_for_goal(
     cursor = conn.cursor()
     cursor.execute("SELECT * FROM goals WHERE id = ? AND user_id = ?", (goal_id, user_id))
     goal = cursor.fetchone()
-    cursor.execute("SELECT monthly_income FROM users WHERE id = ?", (user_id,))
-    user = cursor.fetchone()
     conn.close()
 
     if not goal:
         raise HTTPException(status_code=404, detail="Goal not found")
 
-    monthly_income = float(user["monthly_income"]) if user else 0.0
+    monthly_income = effective_income(user_id)["value"]
 
     return generate_goal_plans(
         target_amount=goal["target_amount"],

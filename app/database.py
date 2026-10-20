@@ -3,8 +3,22 @@ import os
 import json
 import random
 from datetime import datetime, timedelta
+from contextlib import contextmanager
 
 DB_PATH = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "finances.db")
+
+@contextmanager
+def db():
+    """Yields connection, commits on success, rollbacks on exception, always closes."""
+    conn = get_db_connection()
+    try:
+        yield conn
+        conn.commit()
+    except Exception:
+        conn.rollback()
+        raise
+    finally:
+        conn.close()
 
 DEFAULT_CATEGORIES = [
     ('Salary', 'income', 1, 'wallet'),
@@ -56,6 +70,10 @@ def init_db(force_reseed: bool = False):
         inflation REAL DEFAULT 0.03,
         emergency_months INTEGER DEFAULT 6,
         currency TEXT DEFAULT 'USD',
+        income_mode TEXT DEFAULT 'manual',
+        expense_mode TEXT DEFAULT 'auto',
+        expense_manual REAL NULL,
+        blend_weight REAL DEFAULT 0.5,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
     );
 
@@ -95,6 +113,7 @@ def init_db(force_reseed: bool = False):
         selected_plan TEXT DEFAULT 'Balanced',
         status TEXT NOT NULL DEFAULT 'In Progress',
         notes TEXT,
+        goal_type TEXT DEFAULT 'savings',
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         FOREIGN KEY(user_id) REFERENCES users(id)
     );
@@ -212,18 +231,31 @@ def init_db(force_reseed: bool = False):
         ("volatility", "REAL DEFAULT 0.10"),
         ("inflation", "REAL DEFAULT 0.03"),
         ("emergency_months", "INTEGER DEFAULT 6"),
-        ("currency", "TEXT DEFAULT 'USD'")
+        ("currency", "TEXT DEFAULT 'USD'"),
+        ("income_mode", "TEXT DEFAULT 'manual'"),
+        ("expense_mode", "TEXT DEFAULT 'auto'"),
+        ("expense_manual", "REAL NULL"),
+        ("blend_weight", "REAL DEFAULT 0.5")
     ]
     for col_name, col_def in migrations:
         if col_name not in existing_cols:
-            cursor.execute(f"ALTER TABLE users ADD COLUMN {col_name} {col_def}")
+            try:
+                cursor.execute(f"ALTER TABLE users ADD COLUMN {col_name} {col_def}")
+            except sqlite3.OperationalError:
+                pass
 
-    # Idempotent migration for goals.initial_savings
+    # Idempotent migration for goals.initial_savings and goal_type
     cursor.execute("PRAGMA table_info(goals)")
     goal_cols = {row["name"] for row in cursor.fetchall()}
     if "initial_savings" not in goal_cols:
         cursor.execute("ALTER TABLE goals ADD COLUMN initial_savings REAL DEFAULT 0")
         cursor.execute("UPDATE goals SET initial_savings = current_savings WHERE initial_savings = 0")
+    if "goal_type" not in goal_cols:
+        try:
+            cursor.execute("ALTER TABLE goals ADD COLUMN goal_type TEXT DEFAULT 'savings'")
+        except sqlite3.OperationalError:
+            pass
+    cursor.execute("UPDATE goals SET goal_type = 'emergency' WHERE (goal_type IS NULL OR goal_type = 'savings') AND (LOWER(title) LIKE '%emergency%' OR LOWER(title) LIKE '%safety%')")
 
     # Idempotent migration for transactions.source
     cursor.execute("PRAGMA table_info(transactions)")
@@ -278,7 +310,8 @@ def clear_user_data(conn):
         SET username = 'me', full_name = 'New User', role = 'User',
             monthly_income = 0, onboarded = 0, est_monthly_expense = 0,
             risk_profile = 'moderate', expected_return = 0.05, volatility = 0.10,
-            inflation = 0.03, emergency_months = 6, currency = 'USD'
+            inflation = 0.03, emergency_months = 6, currency = 'USD',
+            income_mode = 'manual', expense_mode = 'auto', expense_manual = NULL, blend_weight = 0.5
         WHERE id = 1
     """)
     conn.commit()
@@ -294,7 +327,8 @@ def seed_demo_data(conn):
         SET username = 'demo_user', full_name = 'Alex Morgan', role = 'User',
             monthly_income = 5000, onboarded = 1, est_monthly_expense = 2750,
             risk_profile = 'moderate', expected_return = 0.05, volatility = 0.10,
-            inflation = 0.03, emergency_months = 6, currency = 'USD'
+            inflation = 0.03, emergency_months = 6, currency = 'USD',
+            income_mode = 'manual', expense_mode = 'auto', expense_manual = NULL, blend_weight = 0.5
         WHERE id = 1
     """)
 
@@ -304,14 +338,14 @@ def seed_demo_data(conn):
     target_dt1 = add_months(base_date, 12).strftime("%Y-%m-%d")
     target_dt2 = add_months(base_date, 8).strftime("%Y-%m-%d")
     cursor.execute("""
-        INSERT INTO goals (user_id, title, target_amount, current_savings, initial_savings, monthly_contribution, target_date, selected_plan, status, notes)
-        VALUES (1, 'Emergency Fund (6 Months Expenses)', 18000, 6500, 6500, 800, ?, 'Balanced', 'In Progress', 'High priority safety net for unexpected healthcare or career transitions.')
+        INSERT INTO goals (user_id, title, target_amount, current_savings, initial_savings, monthly_contribution, target_date, selected_plan, status, notes, goal_type)
+        VALUES (1, 'Emergency Fund (6 Months Expenses)', 18000, 6500, 6500, 800, ?, 'Balanced', 'In Progress', 'High priority safety net for unexpected healthcare or career transitions.', 'emergency')
     """, (target_dt1,))
     first_goal_id = cursor.lastrowid
 
     cursor.execute("""
-        INSERT INTO goals (user_id, title, target_amount, current_savings, initial_savings, monthly_contribution, target_date, selected_plan, status, notes)
-        VALUES (1, 'Japan Autumn Travel Trip 2027', 4000, 1200, 1200, 400, ?, 'Conservative', 'In Progress', 'Flight tickets, hotel accommodation in Tokyo & Kyoto.')
+        INSERT INTO goals (user_id, title, target_amount, current_savings, initial_savings, monthly_contribution, target_date, selected_plan, status, notes, goal_type)
+        VALUES (1, 'Japan Autumn Travel Trip 2027', 4000, 1200, 1200, 400, ?, 'Conservative', 'In Progress', 'Flight tickets, hotel accommodation in Tokyo & Kyoto.', 'savings')
     """, (target_dt2,))
 
     # 2. Generate transactions

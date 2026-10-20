@@ -84,9 +84,8 @@ def build_discretionary_proposal(conn: sqlite3.Connection, user_id: int = 1) -> 
     or raises ValueError if prerequisites are missing.
     """
     cursor = conn.cursor()
-    cursor.execute("SELECT monthly_income, expected_return, volatility, inflation FROM users WHERE id = ?", (user_id,))
-    u_row = cursor.fetchone()
-    monthly_income = float(u_row["monthly_income"]) if u_row and u_row["monthly_income"] is not None else 0.0
+    from app.services.metrics import effective_income
+    monthly_income = effective_income(user_id)["value"]
     if monthly_income <= 0:
         raise ValueError("Monthly income must be greater than zero to generate proposals.")
 

@@ -7,7 +7,7 @@ from app.schemas import MonteCarloGoalResponse, ForecastResponse, LoanVsCashRequ
 from app.security import get_current_role
 from app.services.audit import record_audit_log
 from app.services.assumptions import goal_assumptions
-from app.services.metrics import history_series
+from app.services.metrics import history_series, effective_income
 from app.services.quant import (
     required_monthly_payment,
     real_target,
@@ -40,7 +40,7 @@ def get_goal_monte_carlo(
     """Runs vectorized Monte Carlo simulation for a specific savings goal."""
     user_id = 1
     prof = get_user_profile(user_id)
-    monthly_income = float(prof.get("monthly_income", 0.0))
+    monthly_income = effective_income(user_id)["value"]
     
     conn = get_db_connection()
     cursor = conn.cursor()
@@ -159,7 +159,7 @@ def get_expense_forecast(role: str = Depends(get_current_role)):
     """Computes EWMA monthly expense forecast, Cash-Flow-at-Risk (95%), and Emergency Fund needed."""
     user_id = 1
     prof = get_user_profile(user_id)
-    monthly_income = float(prof.get("monthly_income", 0.0))
+    monthly_income = effective_income(user_id)["value"]
     emergency_months = int(prof.get("emergency_months", 6))
 
     h_data = history_series(user_id=user_id)

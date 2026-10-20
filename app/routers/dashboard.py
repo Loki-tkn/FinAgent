@@ -4,7 +4,7 @@ from typing import Dict, Any, Optional
 from datetime import datetime
 from app.database import get_db_connection
 from app.services.health_score import calculate_financial_health_score
-from app.services.metrics import monthly_avg_expense, history_series
+from app.services.metrics import monthly_avg_expense, history_series, effective_income
 from app.security import get_current_role
 from app.services.assumptions import goal_assumptions
 from app.services.quant import (
@@ -24,15 +24,13 @@ def get_dashboard_summary(role: str = Depends(get_current_role)) -> Dict[str, An
     cash flow trend data, and quantitative analytics for the main dashboard.
     """
     user_id = 1
-    from app.services.recurring import materialize_recurring
-    materialize_recurring(user_id=user_id)
 
     conn = get_db_connection()
     cursor = conn.cursor()
 
     cursor.execute("SELECT id, full_name, role, monthly_income, onboarded, emergency_months, expected_return, volatility, inflation, est_monthly_expense FROM users WHERE id = ?", (user_id,))
     user = cursor.fetchone()
-    monthly_income = float(user["monthly_income"]) if user and user["monthly_income"] is not None else 0.0
+    user_manual_income = float(user["monthly_income"]) if user and user["monthly_income"] is not None else 0.0
     emergency_target = int(user["emergency_months"]) if user and user["emergency_months"] else 6
     is_onboarded = bool(user["onboarded"]) if user else False
     ann_return = float(user["expected_return"]) if user and user["expected_return"] is not None else 0.05
@@ -54,8 +52,11 @@ def get_dashboard_summary(role: str = Depends(get_current_role)) -> Dict[str, An
     total_savings = goal_stats["total_saved"] or 0.0
     total_target = goal_stats["total_target"] or 0.0
 
-    cursor.execute("SELECT current_savings FROM goals WHERE user_id = ? AND (LOWER(title) LIKE '%emergency%' OR LOWER(title) LIKE '%safety%') LIMIT 1", (user_id,))
+    cursor.execute("SELECT current_savings FROM goals WHERE user_id = ? AND goal_type = 'emergency' LIMIT 1", (user_id,))
     em_row = cursor.fetchone()
+    if not em_row:
+        cursor.execute("SELECT current_savings FROM goals WHERE user_id = ? AND (LOWER(title) LIKE '%emergency%' OR LOWER(title) LIKE '%safety%') LIMIT 1", (user_id,))
+        em_row = cursor.fetchone()
     emergency_savings = float(em_row["current_savings"]) if em_row and em_row["current_savings"] is not None else 0.0
 
     now = datetime.now()
@@ -65,14 +66,17 @@ def get_dashboard_summary(role: str = Depends(get_current_role)) -> Dict[str, An
     exp_history = h_data["exp_series"]
     surplus_history = h_data["surplus_series"]
 
+    inc_info = effective_income(user_id=user_id)
+    effective_inc = inc_info["value"]
+
     metrics = monthly_avg_expense(user_id=user_id, exclude_anomalies=True)
     essential_expense = metrics["essential"]
     discretionary_expense = metrics["discretionary"]
     total_monthly_expense = metrics["total"]
     is_low_data = metrics.get("low_data", False)
 
-    monthly_surplus = monthly_income - total_monthly_expense
-    savings_rate = (monthly_surplus / monthly_income * 100.0) if monthly_income > 0 else 0.0
+    monthly_surplus = effective_inc - total_monthly_expense
+    savings_rate = (monthly_surplus / effective_inc * 100.0) if effective_inc > 0 else 0.0
 
     cursor.execute("""
         SELECT category, is_essential, SUM(amount) as total_amount
@@ -149,7 +153,7 @@ def get_dashboard_summary(role: str = Depends(get_current_role)) -> Dict[str, An
 
     conn.close()
 
-    needs_setup = (monthly_income <= 0)
+    needs_setup = (effective_inc <= 0)
 
     # Compute Quant Summary for Primary Goal
     quant_data = None
@@ -206,7 +210,7 @@ def get_dashboard_summary(role: str = Depends(get_current_role)) -> Dict[str, An
         }
 
     health = calculate_financial_health_score(
-        monthly_income=monthly_income,
+        monthly_income=effective_inc,
         total_monthly_expense=total_monthly_expense,
         essential_expense=essential_expense,
         discretionary_expense=discretionary_expense,
@@ -221,15 +225,22 @@ def get_dashboard_summary(role: str = Depends(get_current_role)) -> Dict[str, An
         "user": {
             "name": user["full_name"] if user else "New User",
             "active_role": role,
-            "monthly_income": monthly_income,
+            "monthly_income": user_manual_income,
             "onboarded": is_onboarded
         },
         "needs_setup": needs_setup,
         "low_data": is_low_data,
         "metrics": {
-            "monthly_income": monthly_income,
+            "monthly_income": effective_inc,
             "income_from_transactions_avg": inc_from_tx_avg,
+            "income_auto": inc_info["auto"],
+            "income_manual": inc_info["manual"],
+            "income_mode": inc_info["mode"],
             "total_monthly_expense": total_monthly_expense,
+            "expense_auto": metrics.get("auto_total", total_monthly_expense),
+            "expense_manual": metrics.get("manual_total"),
+            "expense_mode": metrics.get("mode", "auto"),
+            "blend_weight": inc_info.get("weight", 0.5),
             "essential_expense": essential_expense,
             "discretionary_expense": discretionary_expense,
             "monthly_surplus": monthly_surplus,

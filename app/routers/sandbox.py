@@ -5,17 +5,13 @@ from app.database import get_db_connection
 from app.schemas import SandboxProposalCreate, SandboxApprovalAction
 from app.services.sandbox import get_all_sandbox_proposals, create_sandbox_proposal, process_sandbox_proposal
 from app.security import get_current_role, require_role
+from app.services.metrics import effective_income
 
 router = APIRouter(prefix="/api/sandbox", tags=["Sandbox Approval Hub"])
 
 
 def _get_monthly_income(user_id: int = 1) -> float:
-    conn = get_db_connection()
-    cursor = conn.cursor()
-    cursor.execute("SELECT monthly_income FROM users WHERE id = ?", (user_id,))
-    row = cursor.fetchone()
-    conn.close()
-    return float(row["monthly_income"]) if row else 0.0
+    return effective_income(user_id)["value"]
 
 
 @router.get("/proposals")
@@ -53,16 +49,13 @@ def create_proposal(
 def generate_proposal(role: str = Depends(require_role("User"))):
     """Generates a pending proposal from planner Balanced plan's top 3 discretionary cuts."""
     user_id = 1
-    conn = get_db_connection()
-    cursor = conn.cursor()
-
-    cursor.execute("SELECT monthly_income, expected_return, volatility, inflation FROM users WHERE id = ?", (user_id,))
-    u_row = cursor.fetchone()
-    monthly_income = float(u_row["monthly_income"]) if u_row and u_row["monthly_income"] is not None else 0.0
+    monthly_income = effective_income(user_id)["value"]
 
     if monthly_income <= 0:
-        conn.close()
         raise HTTPException(status_code=422, detail="Monthly income must be greater than zero to generate proposals.")
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
 
     cursor.execute("""
         SELECT id, title, target_amount, current_savings, monthly_contribution, target_date
