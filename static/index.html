@@ -1,16 +1,21 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AI Personal Financial Agent | Fintechathon</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;500;600&display=swap"
+        rel="stylesheet">
     <script src="https://unpkg.com/lucide@latest"></script>
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <link rel="stylesheet" href="/static/css/style.css">
 </head>
+12:26 PM
+
 <body class="dark-theme">
     <div class="app-layout">
         <aside class="sidebar">
@@ -87,7 +92,8 @@
             <header class="top-header">
                 <div class="header-left">
                     <h1 id="page-title">Financial Dashboard</h1>
-                    <p class="header-subtext" id="page-subtitle">AI-assisted personal wealth optimization and simulated decision sandbox.</p>
+                    <p class="header-subtext" id="page-subtitle">AI-assisted personal wealth optimization and simulated
+                        decision sandbox.</p>
                 </div>
 
                 <div class="header-right">
@@ -105,25 +111,33 @@
                         </select>
                     </div>
 
-                    <button class="btn btn-secondary btn-sm" onclick="switchTab('tab-settings')" title="Configure Profile">
+                    <button class="btn btn-secondary btn-sm" onclick="switchTab('tab-settings')"
+                        title="Configure Profile">
                         <i data-lucide="user-cog"></i> Profile
                     </button>
                 </div>
             </header>
 
-            <div id="low-data-banner" class="banner-low-data" style="display: none; background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.4); border-radius: 12px; padding: 0.75rem 1.25rem; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.6rem; font-size: 0.82rem; color: #fde68a;">
+            <div id="low-data-banner" class="banner-low-data"
+                style="display: none; background: rgba(245, 158, 11, 0.15); border: 1px solid rgba(245, 158, 11, 0.4); border-radius: 12px; padding: 0.75rem 1.25rem; margin-bottom: 1rem; display: flex; align-items: center; gap: 0.6rem; font-size: 0.82rem; color: #fde68a;">
                 <i data-lucide="alert-circle" style="color: #f59e0b; width: 18px; height: 18px;"></i>
-                <span><strong>Notice:</strong> Estimates based on your declared expenses; add 2+ months of transactions for accurate historical analysis.</span>
+                <span><strong>Notice:</strong> Estimates based on your declared expenses; add 2+ months of transactions
+                    for accurate historical analysis.</span>
             </div>
 
             <!-- TAB 1: DASHBOARD -->
             <section id="tab-dashboard" class="tab-pane active">
-                <div id="dashboard-setup-banner" style="display: none; background: linear-gradient(90deg, rgba(6, 182, 212, 0.15), rgba(139, 92, 246, 0.1)); border: 1px solid rgba(6, 182, 212, 0.3); border-radius: 12px; padding: 1.25rem; margin-bottom: 1.5rem; text-align: center;">
-                    <h3><i data-lucide="sparkles" style="color: #06b6d4; display: inline-block;"></i> Welcome to your Financial Agent!</h3>
-                    <p style="font-size: 0.85rem; color: #9ca3af; margin: 0.4rem 0 1rem 0;">Get started by entering your monthly income and savings goal or loading sample demo data.</p>
+                <div id="dashboard-setup-banner"
+                    style="display: none; background: linear-gradient(90deg, rgba(6, 182, 212, 0.15), rgba(139, 92, 246, 0.1)); border: 1px solid rgba(6, 182, 212, 0.3); border-radius: 12px; padding: 1.25rem; margin-bottom: 1.5rem; text-align: center;">
+                    <h3><i data-lucide="sparkles" style="color: #06b6d4; display: inline-block;"></i> Welcome to your
+                        Financial Agent!</h3>
+                    <p style="font-size: 0.85rem; color: #9ca3af; margin: 0.4rem 0 1rem 0;">Get started by entering your
+                        monthly income and savings goal or loading sample demo data.</p>
                     <div style="display: flex; gap: 0.75rem; justify-content: center;">
-                        <button class="btn btn-primary btn-sm" onclick="openOnboardingWizard()"><i data-lucide="user-plus"></i> Setup Profile</button>
-                        <button class="btn btn-secondary btn-sm" onclick="handleLoadDemoData()"><i data-lucide="database"></i> Load Demo Data</button>
+                        <button class="btn btn-primary btn-sm" onclick="openOnboardingWizard()"><i
+                                data-lucide="user-plus"></i> Setup Profile</button>
+                        <button class="btn btn-secondary btn-sm" onclick="handleLoadDemoData()"><i
+                                data-lucide="database"></i> Load Demo Data</button>
                     </div>
                 </div>
 
@@ -262,17 +276,20 @@
                         <form id="goal-planner-form" onsubmit="handleCalculatePlans(event)">
                             <div class="form-group">
                                 <label for="goal-title">Goal Title</label>
-                                <input type="text" id="goal-title" class="form-control" value="Emergency Fund" required placeholder="e.g. Buying a Car, Wedding, Home Downpayment">
+                                <input type="text" id="goal-title" class="form-control" value="Emergency Fund" required
+                                    placeholder="e.g. Buying a Car, Wedding, Home Downpayment">
                             </div>
 
                             <div class="form-row">
                                 <div class="form-group">
                                     <label for="goal-target">Target Amount ($)</label>
-                                    <input type="number" id="goal-target" class="form-control" value="10000" step="100" min="10" required>
+                                    <input type="number" id="goal-target" class="form-control" value="10000" step="100"
+                                        min="10" required>
                                 </div>
                                 <div class="form-group">
                                     <label for="goal-current">Current Savings ($)</label>
-                                    <input type="number" id="goal-current" class="form-control" value="2000" step="50" min="0" required>
+                                    <input type="number" id="goal-current" class="form-control" value="2000" step="50"
+                                        min="0" required>
                                 </div>
                             </div>
 
@@ -283,7 +300,8 @@
                                 </div>
                                 <div class="form-group">
                                     <label for="goal-income">Monthly Income ($)</label>
-                                    <input type="number" id="goal-income" class="form-control" value="4000" step="50" required>
+                                    <input type="number" id="goal-income" class="form-control" value="4000" step="50"
+                                        required>
                                 </div>
                             </div>
 
@@ -303,7 +321,8 @@
                         <div class="planner-summary-body" id="planner-summary-content">
                             <div class="placeholder-state">
                                 <i data-lucide="cpu"></i>
-                                <p>Click "Generate 3 AI Action Plans" to analyze required monthly savings and explore Conservative, Balanced, and Aggressive strategies.</p>
+                                <p>Click "Generate 3 AI Action Plans" to analyze required monthly savings and explore
+                                    Conservative, Balanced, and Aggressive strategies.</p>
                             </div>
                         </div>
                     </div>
@@ -320,10 +339,11 @@
                         </div>
                         <span class="card-badge" id="mc-prob-badge">Probability: --%</span>
                     </div>
-                    
+
                     <div class="dashboard-grid">
                         <div>
-                            <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.6rem; margin-bottom: 1rem;">
+                            <div
+                                style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.6rem; margin-bottom: 1rem;">
                                 <div class="tracker-stat-pill">
                                     <span>Success Probability</span>
                                     <strong id="mc-stat-prob" class="text-emerald">--%</strong>
@@ -338,19 +358,23 @@
                                 </div>
                             </div>
 
-                            <form id="mc-params-form" onsubmit="handleRunGoalMonteCarlo(event)" style="background: rgba(0,0,0,0.2); padding: 0.85rem; border-radius: 8px; font-size: 0.8rem;">
+                            <form id="mc-params-form" onsubmit="handleRunGoalMonteCarlo(event)"
+                                style="background: rgba(0,0,0,0.2); padding: 0.85rem; border-radius: 8px; font-size: 0.8rem;">
                                 <div class="form-row">
                                     <div class="form-group">
                                         <label>Expected Return (Ann.)</label>
-                                        <input type="number" id="mc-input-return" class="form-control form-control-sm" step="0.005" min="0" max="0.5" value="0.05">
+                                        <input type="number" id="mc-input-return" class="form-control form-control-sm"
+                                            step="0.005" min="0" max="0.5" value="0.05">
                                     </div>
                                     <div class="form-group">
                                         <label>Volatility (Ann.)</label>
-                                        <input type="number" id="mc-input-vol" class="form-control form-control-sm" step="0.005" min="0" max="0.5" value="0.10">
+                                        <input type="number" id="mc-input-vol" class="form-control form-control-sm"
+                                            step="0.005" min="0" max="0.5" value="0.10">
                                     </div>
                                     <div class="form-group">
                                         <label>Inflation (Ann.)</label>
-                                        <input type="number" id="mc-input-inf" class="form-control form-control-sm" step="0.005" min="0" max="0.2" value="0.03">
+                                        <input type="number" id="mc-input-inf" class="form-control form-control-sm"
+                                            step="0.005" min="0" max="0.2" value="0.03">
                                     </div>
                                 </div>
                                 <button type="submit" class="btn btn-secondary btn-sm btn-block">
@@ -398,7 +422,8 @@
                 <div class="section-header">
                     <div>
                         <h2>Spending Anomaly Detection</h2>
-                        <p>Robust statistical detection using Modified Z-Score on log distributions (Median / MAD) to flag irregular spending spikes.</p>
+                        <p>Robust statistical detection using Modified Z-Score on log distributions (Median / MAD) to
+                            flag irregular spending spikes.</p>
                     </div>
                     <div class="header-actions">
                         <button class="btn btn-primary" onclick="runAnomalyScan()">
@@ -451,7 +476,8 @@
                 <div class="section-header">
                     <div>
                         <h2>What-If Financial Decision Simulator</h2>
-                        <p>Simulate purchases, rent changes, salary raises, or compare financing vs paying full cash.</p>
+                        <p>Simulate purchases, rent changes, salary raises, or compare financing vs paying full cash.
+                        </p>
                     </div>
                 </div>
 
@@ -467,20 +493,25 @@
                             <div class="form-group">
                                 <label for="sim-type">Scenario Type</label>
                                 <select id="sim-type" class="form-control" onchange="updateSimFormLabels()">
-                                    <option value="one_off_purchase">One-off Major Purchase (e.g. Laptop, Vacation, Car)</option>
-                                    <option value="recurring_expense_change">Monthly Expense Increase (e.g. Rent, Gym, Subscription)</option>
-                                    <option value="income_change">Monthly Income Shift (e.g. Promotion, Salary Raise/Cut)</option>
+                                    <option value="one_off_purchase">One-off Major Purchase (e.g. Laptop, Vacation, Car)
+                                    </option>
+                                    <option value="recurring_expense_change">Monthly Expense Increase (e.g. Rent, Gym,
+                                        Subscription)</option>
+                                    <option value="income_change">Monthly Income Shift (e.g. Promotion, Salary
+                                        Raise/Cut)</option>
                                 </select>
                             </div>
 
                             <div class="form-group">
                                 <label for="sim-desc">Scenario Description</label>
-                                <input type="text" id="sim-desc" class="form-control" value="Buy Apple MacBook Pro" required>
+                                <input type="text" id="sim-desc" class="form-control" value="Buy Apple MacBook Pro"
+                                    required>
                             </div>
 
                             <div class="form-group">
                                 <label for="sim-amount" id="sim-amount-label">Purchase Amount ($)</label>
-                                <input type="number" id="sim-amount" class="form-control" value="1500" step="50" required>
+                                <input type="number" id="sim-amount" class="form-control" value="1500" step="50"
+                                    required>
                             </div>
 
                             <div class="form-group">
@@ -489,12 +520,22 @@
                             </div>
 
                             <div class="preset-buttons">
-                                <label class="text-muted" style="font-size: 0.8rem; display: block; margin-bottom: 0.4rem;">Quick Presets:</label>
+                                <label class="text-muted"
+                                    style="font-size: 0.8rem; display: block; margin-bottom: 0.4rem;">Quick
+                                    Presets:</label>
                                 <div class="btn-group-wrap">
-                                    <button type="button" class="btn btn-preset" onclick="setSimPreset('one_off_purchase', 'New Laptop', 1500)">Laptop ($1.5k)</button>
-                                    <button type="button" class="btn btn-preset" onclick="setSimPreset('one_off_purchase', 'Vacation Trip', 2500)">Vacation ($2.5k)</button>
-                                    <button type="button" class="btn btn-preset" onclick="setSimPreset('recurring_expense_change', 'Rent Upgrade', 250)">+$250 Rent/mo</button>
-                                    <button type="button" class="btn btn-preset" onclick="setSimPreset('income_change', 'Promotion Raise', 600)">+$600 Salary/mo</button>
+                                    <button type="button" class="btn btn-preset"
+                                        onclick="setSimPreset('one_off_purchase', 'New Laptop', 1500)">Laptop
+                                        ($1.5k)</button>
+                                    <button type="button" class="btn btn-preset"
+                                        onclick="setSimPreset('one_off_purchase', 'Vacation Trip', 2500)">Vacation
+                                        ($2.5k)</button>
+                                    <button type="button" class="btn btn-preset"
+                                        onclick="setSimPreset('recurring_expense_change', 'Rent Upgrade', 250)">+$250
+                                        Rent/mo</button>
+                                    <button type="button" class="btn btn-preset"
+                                        onclick="setSimPreset('income_change', 'Promotion Raise', 600)">+$600
+                                        Salary/mo</button>
                                 </div>
                             </div>
 
@@ -515,7 +556,8 @@
                         <div class="sim-results-body" id="sim-results-container">
                             <div class="placeholder-state">
                                 <i data-lucide="sparkles"></i>
-                                <p>Select a scenario and click "Run Simulation" to visualize timeline delays or accelerations.</p>
+                                <p>Select a scenario and click "Run Simulation" to visualize timeline delays or
+                                    accelerations.</p>
                             </div>
                         </div>
                     </div>
@@ -530,39 +572,45 @@
                         </div>
                         <span class="card-badge" id="loan-vs-cash-badge">Compare Financing</span>
                     </div>
-                    
+
                     <div class="dashboard-grid">
                         <form onsubmit="handleLoanVsCashSubmit(event)">
                             <div class="form-row">
                                 <div class="form-group">
                                     <label>Total Item Price ($)</label>
-                                    <input type="number" id="lvc-price" class="form-control" value="25000" min="100" step="500" required>
+                                    <input type="number" id="lvc-price" class="form-control" value="25000" min="100"
+                                        step="500" required>
                                 </div>
                                 <div class="form-group">
                                     <label>Down Payment ($)</label>
-                                    <input type="number" id="lvc-down" class="form-control" value="5000" min="0" step="100" required>
+                                    <input type="number" id="lvc-down" class="form-control" value="5000" min="0"
+                                        step="100" required>
                                 </div>
                             </div>
                             <div class="form-row">
                                 <div class="form-group">
                                     <label>Loan APR Rate</label>
-                                    <input type="number" id="lvc-rate" class="form-control" value="0.06" step="0.005" min="0" max="0.5" required>
+                                    <input type="number" id="lvc-rate" class="form-control" value="0.06" step="0.005"
+                                        min="0" max="0.5" required>
                                 </div>
                                 <div class="form-group">
                                     <label>Loan Term (Months)</label>
-                                    <input type="number" id="lvc-months" class="form-control" value="36" min="1" max="120" required>
+                                    <input type="number" id="lvc-months" class="form-control" value="36" min="1"
+                                        max="120" required>
                                 </div>
                             </div>
                             <div class="form-group">
                                 <label>Opportunity Cost Discount Rate (Investment Yield)</label>
-                                <input type="number" id="lvc-opp-return" class="form-control" value="0.05" step="0.005" min="0" max="0.5">
+                                <input type="number" id="lvc-opp-return" class="form-control" value="0.05" step="0.005"
+                                    min="0" max="0.5">
                             </div>
                             <button type="submit" class="btn btn-primary btn-sm btn-block">
                                 <i data-lucide="calculator"></i> Calculate NPV & Better Choice
                             </button>
                         </form>
 
-                        <div id="lvc-result-box" style="background: rgba(0,0,0,0.2); padding: 1rem; border-radius: 8px; display: flex; flex-direction: column; justify-content: center;">
+                        <div id="lvc-result-box"
+                            style="background: rgba(0,0,0,0.2); padding: 1rem; border-radius: 8px; display: flex; flex-direction: column; justify-content: center;">
                             <div class="placeholder-state" style="padding: 1rem;">
                                 <i data-lucide="info"></i>
                                 <p>Enter purchase details and click Calculate to evaluate loan NPV vs paying cash.</p>
@@ -577,7 +625,8 @@
                 <div class="section-header">
                     <div>
                         <h2>Milestone Progress Tracker</h2>
-                        <p>Compare actual saved funds against target trajectory and calculate dynamic catch-up adjustments.</p>
+                        <p>Compare actual saved funds against target trajectory and calculate dynamic catch-up
+                            adjustments.</p>
                     </div>
                 </div>
 
@@ -612,7 +661,8 @@
                 <div class="section-header">
                     <div>
                         <h2>Sandbox Financial Proposal Hub</h2>
-                        <p>Simulate financial actions without risking real funds. Explicit user approval is mandatory before any plan is applied.</p>
+                        <p>Simulate financial actions without risking real funds. Explicit user approval is mandatory
+                            before any plan is applied.</p>
                     </div>
                     <button class="btn btn-secondary" onclick="openNewProposalModal()">
                         <i data-lucide="plus-circle"></i> Create Sandbox Proposal
@@ -680,13 +730,15 @@
                             <h3>Transaction History</h3>
                         </div>
                         <div class="table-filters">
-                            <select id="tx-filter-type" onchange="loadTransactions()" class="form-control form-control-sm">
+                            <select id="tx-filter-type" onchange="loadTransactions()"
+                                class="form-control form-control-sm">
                                 <option value="">All Types</option>
                                 <option value="income">Income Only</option>
                                 <option value="expense">Expense Only</option>
                             </select>
                             <label class="checkbox-inline">
-                                <input type="checkbox" id="tx-filter-anomaly" onchange="loadTransactions()"> Anomaly Only
+                                <input type="checkbox" id="tx-filter-anomaly" onchange="loadTransactions()"> Anomaly
+                                Only
                             </label>
                         </div>
                     </div>
@@ -715,7 +767,8 @@
                 <div class="section-header">
                     <div>
                         <h2>User Profile & Financial Settings</h2>
-                        <p>Configure your declared monthly income, risk tolerance, inflation expectations, and emergency reserves.</p>
+                        <p>Configure your declared monthly income, risk tolerance, inflation expectations, and emergency
+                            reserves.</p>
                     </div>
                 </div>
 
@@ -730,16 +783,19 @@
                         <form id="profile-form" onsubmit="handleSaveProfile(event)">
                             <div class="form-group">
                                 <label for="prof-fullname">Full Name</label>
-                                <input type="text" id="prof-fullname" class="form-control" placeholder="e.g. Alex Morgan">
+                                <input type="text" id="prof-fullname" class="form-control"
+                                    placeholder="e.g. Alex Morgan">
                             </div>
                             <div class="form-row">
                                 <div class="form-group">
                                     <label for="prof-income">Monthly Income ($)</label>
-                                    <input type="number" id="prof-income" class="form-control" min="0" step="50" required>
+                                    <input type="number" id="prof-income" class="form-control" min="0" step="50"
+                                        required>
                                 </div>
                                 <div class="form-group">
                                     <label for="prof-expense">Estimated Monthly Expense ($)</label>
-                                    <input type="number" id="prof-expense" class="form-control" min="0" step="50" placeholder="Used when transaction history is low">
+                                    <input type="number" id="prof-expense" class="form-control" min="0" step="50"
+                                        placeholder="Used when transaction history is low">
                                 </div>
                             </div>
                             <div class="form-row">
@@ -763,7 +819,8 @@
                             </div>
                             <div class="form-group">
                                 <label for="prof-inflation">Expected Annual Inflation Rate</label>
-                                <input type="number" id="prof-inflation" class="form-control" step="0.005" min="0" max="0.20" value="0.03">
+                                <input type="number" id="prof-inflation" class="form-control" step="0.005" min="0"
+                                    max="0.20" value="0.03">
                                 <span class="text-muted" style="font-size: 0.72rem;">Default: 0.03 (3.0% / year)</span>
                             </div>
                             <button type="submit" class="btn btn-primary btn-block">
@@ -780,7 +837,9 @@
                             </div>
                         </div>
                         <div style="font-size: 0.85rem; color: var(--text-secondary); margin-bottom: 1.25rem;">
-                            <p><strong>Demo Mode Control:</strong> Real users can enter clean personal financial data. Demo data can be loaded or cleared at any time for testing and competition evaluation.</p>
+                            <p><strong>Demo Mode Control:</strong> Real users can enter clean personal financial data.
+                                Demo data can be loaded or cleared at any time for testing and competition evaluation.
+                            </p>
                         </div>
                         <div style="display: flex; flex-direction: column; gap: 0.85rem;">
                             <button class="btn btn-secondary" onclick="handleLoadDemoData()">
@@ -799,7 +858,8 @@
                 <div class="section-header">
                     <div>
                         <h2>Immutable System Audit Trail</h2>
-                        <p>Complete log of timestamps, role tiers, actions, approvals, calculations, and security events.</p>
+                        <p>Complete log of timestamps, role tiers, actions, approvals, calculations, and security
+                            events.</p>
                     </div>
                     <button class="btn btn-secondary" onclick="loadAuditLogs()">
                         <i data-lucide="refresh-cw"></i> Refresh Logs
@@ -846,15 +906,19 @@
                         <div class="rbac-card-body">
                             <div class="tier-item">
                                 <span class="badge badge-viewer">Viewer Tier</span>
-                                <p><strong>Read-Only Access:</strong> Can inspect dashboards, review goal projections, view audit logs. Cannot modify budgets, stage proposals, or execute approvals.</p>
+                                <p><strong>Read-Only Access:</strong> Can inspect dashboards, review goal projections,
+                                    view audit logs. Cannot modify budgets, stage proposals, or execute approvals.</p>
                             </div>
                             <div class="tier-item">
                                 <span class="badge badge-user">User Tier</span>
-                                <p><strong>Personal Finance Manager:</strong> Can add/delete transactions, create savings goals, generate AI plans, execute what-if simulations, stage and approve sandbox proposals.</p>
+                                <p><strong>Personal Finance Manager:</strong> Can add/delete transactions, create
+                                    savings goals, generate AI plans, execute what-if simulations, stage and approve
+                                    sandbox proposals.</p>
                             </div>
                             <div class="tier-item">
                                 <span class="badge badge-admin">Admin Tier</span>
-                                <p><strong>System & Demo Administrator:</strong> Full access including database reseed, benchmark demo resets, system log inspections, and global configuration.</p>
+                                <p><strong>System & Demo Administrator:</strong> Full access including database reseed,
+                                    benchmark demo resets, system log inspections, and global configuration.</p>
                             </div>
                         </div>
                     </div>
@@ -871,14 +935,16 @@
                                 <i data-lucide="check-circle" class="text-success"></i>
                                 <div>
                                     <strong>Zero Bank Credentials Stored:</strong>
-                                    <p>The application never requests or stores bank passwords, OTPs, or credit card numbers.</p>
+                                    <p>The application never requests or stores bank passwords, OTPs, or credit card
+                                        numbers.</p>
                                 </div>
                             </div>
                             <div class="sec-item">
                                 <i data-lucide="check-circle" class="text-success"></i>
                                 <div>
                                     <strong>Sandbox Isolation:</strong>
-                                    <p>All financial actions are strictly staged as pending proposals until the user explicitly authorizes them.</p>
+                                    <p>All financial actions are strictly staged as pending proposals until the user
+                                        explicitly authorizes them.</p>
                                 </div>
                             </div>
                             <div class="sec-item">
@@ -920,7 +986,8 @@
                                     <td><strong>RISK-02</strong></td>
                                     <td>Over-aggressive budget recommendations causing hardship</td>
                                     <td><span class="badge badge-warning">Medium</span></td>
-                                    <td>3-tier choice (Conservative, Balanced, Aggressive) with feasibility ratings and category caps.</td>
+                                    <td>3-tier choice (Conservative, Balanced, Aggressive) with feasibility ratings and
+                                        category caps.</td>
                                 </tr>
                                 <tr>
                                     <td><strong>RISK-03</strong></td>
@@ -932,7 +999,8 @@
                                     <td><strong>RISK-04</strong></td>
                                     <td>Unauthorized plan execution</td>
                                     <td><span class="badge badge-danger">High</span></td>
-                                    <td>Staged Sandbox workflow requiring explicit approval action logged to immutable audit records.</td>
+                                    <td>Staged Sandbox workflow requiring explicit approval action logged to immutable
+                                        audit records.</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -952,36 +1020,46 @@
             <form onsubmit="handleOnboardingSubmit(event)">
                 <div class="modal-body">
                     <div id="ob-step-1" class="ob-step">
-                        <h4 style="margin-bottom: 0.5rem; color: var(--accent-cyan);">Step 1 of 3: Income & Declared Expenses</h4>
-                        <p style="font-size: 0.78rem; color: var(--text-muted); margin-bottom: 1rem;">Declare your regular monthly earnings and estimated living budget.</p>
+                        <h4 style="margin-bottom: 0.5rem; color: var(--accent-cyan);">Step 1 of 3: Income & Declared
+                            Expenses</h4>
+                        <p style="font-size: 0.78rem; color: var(--text-muted); margin-bottom: 1rem;">Declare your
+                            regular monthly earnings and estimated living budget.</p>
                         <div class="form-group">
                             <label>Monthly Take-Home Income ($)</label>
-                            <input type="number" id="ob-income" class="form-control" value="4000" min="100" step="50" required>
+                            <input type="number" id="ob-income" class="form-control" value="4000" min="100" step="50"
+                                required>
                         </div>
                         <div class="form-group">
                             <label>Estimated Monthly Expenses ($)</label>
-                            <input type="number" id="ob-expense" class="form-control" value="2400" min="0" step="50" required>
+                            <input type="number" id="ob-expense" class="form-control" value="2400" min="0" step="50"
+                                required>
                         </div>
                         <div style="text-align: right; margin-top: 1rem;">
-                            <button type="button" class="btn btn-primary btn-sm" onclick="goToObStep(2)">Next: Savings Goal →</button>
+                            <button type="button" class="btn btn-primary btn-sm" onclick="goToObStep(2)">Next: Savings
+                                Goal →</button>
                         </div>
                     </div>
 
                     <div id="ob-step-2" class="ob-step" style="display: none;">
-                        <h4 style="margin-bottom: 0.5rem; color: var(--accent-cyan);">Step 2 of 3: First Savings Goal</h4>
-                        <p style="font-size: 0.78rem; color: var(--text-muted); margin-bottom: 1rem;">Set your primary savings priority (e.g., Emergency Fund or Travel).</p>
+                        <h4 style="margin-bottom: 0.5rem; color: var(--accent-cyan);">Step 2 of 3: First Savings Goal
+                        </h4>
+                        <p style="font-size: 0.78rem; color: var(--text-muted); margin-bottom: 1rem;">Set your primary
+                            savings priority (e.g., Emergency Fund or Travel).</p>
                         <div class="form-group">
                             <label>Goal Title</label>
-                            <input type="text" id="ob-goal-title" class="form-control" value="Emergency Safety Fund" required>
+                            <input type="text" id="ob-goal-title" class="form-control" value="Emergency Safety Fund"
+                                required>
                         </div>
                         <div class="form-row">
                             <div class="form-group">
                                 <label>Target Amount ($)</label>
-                                <input type="number" id="ob-goal-target" class="form-control" value="12000" min="100" step="100" required>
+                                <input type="number" id="ob-goal-target" class="form-control" value="12000" min="100"
+                                    step="100" required>
                             </div>
                             <div class="form-group">
                                 <label>Current Saved ($)</label>
-                                <input type="number" id="ob-goal-current" class="form-control" value="3000" min="0" step="50" required>
+                                <input type="number" id="ob-goal-current" class="form-control" value="3000" min="0"
+                                    step="50" required>
                             </div>
                         </div>
                         <div class="form-group">
@@ -989,14 +1067,18 @@
                             <input type="date" id="ob-goal-date" class="form-control" required>
                         </div>
                         <div style="display: flex; justify-content: space-between; margin-top: 1rem;">
-                            <button type="button" class="btn btn-secondary btn-sm" onclick="goToObStep(1)">← Back</button>
-                            <button type="button" class="btn btn-primary btn-sm" onclick="goToObStep(3)">Next: Risk & Strategy →</button>
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="goToObStep(1)">←
+                                Back</button>
+                            <button type="button" class="btn btn-primary btn-sm" onclick="goToObStep(3)">Next: Risk &
+                                Strategy →</button>
                         </div>
                     </div>
 
                     <div id="ob-step-3" class="ob-step" style="display: none;">
-                        <h4 style="margin-bottom: 0.5rem; color: var(--accent-cyan);">Step 3 of 3: Risk Profile & Preferences</h4>
-                        <p style="font-size: 0.78rem; color: var(--text-muted); margin-bottom: 1rem;">Select your risk tolerance and safety horizon.</p>
+                        <h4 style="margin-bottom: 0.5rem; color: var(--accent-cyan);">Step 3 of 3: Risk Profile &
+                            Preferences</h4>
+                        <p style="font-size: 0.78rem; color: var(--text-muted); margin-bottom: 1rem;">Select your risk
+                            tolerance and safety horizon.</p>
                         <div class="form-group">
                             <label>Risk Tolerance</label>
                             <select id="ob-risk" class="form-control">
@@ -1020,8 +1102,10 @@
                             </div>
                         </div>
                         <div style="display: flex; justify-content: space-between; margin-top: 1rem;">
-                            <button type="button" class="btn btn-secondary btn-sm" onclick="goToObStep(2)">← Back</button>
-                            <button type="submit" class="btn btn-primary btn-sm"><i data-lucide="check"></i> Complete Setup</button>
+                            <button type="button" class="btn btn-secondary btn-sm" onclick="goToObStep(2)">←
+                                Back</button>
+                            <button type="submit" class="btn btn-primary btn-sm"><i data-lucide="check"></i> Complete
+                                Setup</button>
                         </div>
                     </div>
                 </div>
@@ -1053,11 +1137,13 @@
                     </div>
                     <div class="form-group">
                         <label>Amount ($)</label>
-                        <input type="number" id="new-tx-amount" class="form-control" step="1" min="1" required placeholder="e.g. 150">
+                        <input type="number" id="new-tx-amount" class="form-control" step="1" min="1" required
+                            placeholder="e.g. 150">
                     </div>
                     <div class="form-group">
                         <label>Description</label>
-                        <input type="text" id="new-tx-desc" class="form-control" required placeholder="e.g. Weekend grocery restock">
+                        <input type="text" id="new-tx-desc" class="form-control" required
+                            placeholder="e.g. Weekend grocery restock">
                     </div>
                     <div class="form-group">
                         <label>Date</label>
@@ -1083,7 +1169,8 @@
                 <div class="modal-body">
                     <div class="form-group">
                         <label>Category Name</label>
-                        <input type="text" id="cat-name" class="form-control" required placeholder="e.g. Pet Care, Education, Investments">
+                        <input type="text" id="cat-name" class="form-control" required
+                            placeholder="e.g. Pet Care, Education, Investments">
                     </div>
                     <div class="form-row">
                         <div class="form-group">
@@ -1103,7 +1190,8 @@
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" onclick="closeModal('modal-add-category')">Cancel</button>
+                    <button type="button" class="btn btn-secondary"
+                        onclick="closeModal('modal-add-category')">Cancel</button>
                     <button type="submit" class="btn btn-primary">Create Category</button>
                 </div>
             </form>
@@ -1121,7 +1209,8 @@
                 <div class="modal-body">
                     <div class="form-group">
                         <label>Proposal Title</label>
-                        <input type="text" id="prop-title" class="form-control" required placeholder="e.g. Cut Dining & Reallocate to Goal">
+                        <input type="text" id="prop-title" class="form-control" required
+                            placeholder="e.g. Cut Dining & Reallocate to Goal">
                     </div>
                     <div class="form-group">
                         <label>Action Type</label>
@@ -1133,15 +1222,18 @@
                     </div>
                     <div class="form-group">
                         <label>Description & Rationale</label>
-                        <textarea id="prop-desc" class="form-control" rows="2" required placeholder="Explain why this change is suggested..."></textarea>
+                        <textarea id="prop-desc" class="form-control" rows="2" required
+                            placeholder="Explain why this change is suggested..."></textarea>
                     </div>
                     <div class="form-group">
                         <label>Projected Monthly Savings Increase ($)</label>
-                        <input type="number" id="prop-savings-delta" class="form-control" value="200" step="10" required>
+                        <input type="number" id="prop-savings-delta" class="form-control" value="200" step="10"
+                            required>
                     </div>
                 </div>
                 <div class="modal-footer">
-                    <button type="button" class="btn btn-secondary" onclick="closeModal('modal-new-proposal')">Cancel</button>
+                    <button type="button" class="btn btn-secondary"
+                        onclick="closeModal('modal-new-proposal')">Cancel</button>
                     <button type="submit" class="btn btn-primary">Stage Proposal</button>
                 </div>
             </form>
@@ -1153,4 +1245,5 @@
     <script src="/static/js/charts.js"></script>
     <script src="/static/js/app.js"></script>
 </body>
+
 </html>
