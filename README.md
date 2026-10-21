@@ -1,165 +1,312 @@
 # AI Personal Financial Agent
-### Fintechathon MVP | Intelligent Personal Wealth & Savings Planner
 
-A lightweight, high-performance web application designed to help users analyze personal cash flow, establish achievable savings goals, simulate financial decisions, detect irregular spending anomalies, and stage budget changes inside a secure sandbox before execution.
+AI-powered personal finance dashboard and planning assistant for budgeting, saving goals, anomaly detection, and what-if financial simulations.
 
-> **Disclaimer:** All financial figures, bank categories, and transactions within this application are strictly **simulated demo data** formatted in Vietnamese Dong (VND). This is an educational budgeting and financial optimization agent, **not** an investment advice platform.
+## Overview
+This project is a lightweight fintech-style web application designed to help users:
 
----
+- track income and spending
+- review financial health using a scoring model
+- set and monitor savings goals
+- detect unusual spending patterns
+- simulate financial scenarios before making decisions
+- use an AI-assisted finance copilot grounded in processed app data
 
-## 🌟 Key Features
-
-1. **Intelligent Financial Dashboard:**
-   - Real-time income, expense, cash flow surplus, and savings rate calculation.
-   - **0–100 Financial Health Score:** Multi-pillar diagnostic assessing Savings Rate, Essential Needs (50/30/20 rule), Discretionary Wants, and Emergency Runway Buffer.
-   - Interactive Chart.js charts: Monthly Income vs Expense trends and Expense Category donut distribution.
-2. **AI Goal Planner (3 Concrete Strategies):**
-   - Calculates exact required monthly savings and timeline to reach targets.
-   - Automatically generates 3 personalized plans:
-     - **Conservative:** Minimal lifestyle impact (12% non-essential cut).
-     - **Balanced (Recommended):** Optimal 50/30/20 lifestyle optimization (28% non-essential cut + 5% smart savings).
-     - **Aggressive:** Rapid milestone sprint (48% non-essential cut + 10% strict trimming).
-   - Provides concrete itemized category cuts and optimization rationales.
-3. **Statistical Spending Anomaly Detection:**
-   - Evaluates transactions against category rolling moving averages and statistical Z-Scores ($Z = \frac{x - \mu}{\sigma}$).
-   - Classifies anomalies into `HIGH` and `MEDIUM` risk tiers with descriptive alerts for impulse spending.
-4. **What-If Decision Simulator:**
-   - Simulates prospective financial decisions: one-off major purchases (e.g., iPhone, laptop, vacation), recurring expense increases (e.g., rent increase), and salary promotions.
-   - Visualizes exact delays or accelerations in achieving savings targets.
-5. **Milestone Progress Tracking:**
-   - Compares accumulated savings against projected milestone trajectories.
-   - Provides real-time status labels (`On Track`, `Ahead of Schedule`, `Behind Schedule`) and dynamic catch-up recommendations.
-6. **Sandbox Mode & Approval Workflow:**
-   - Staged financial proposals require explicit user authorization (`APPROVE` / `REJECT`) before updating active budgets.
-7. **Immutable Audit Trail:**
-   - Permanent log of timestamps, role tiers, actions, payloads, client IPs, and status outcomes.
+> Disclaimer: This project uses simulated demo financial data for educational and competition purposes. It is not financial advice.
 
 ---
 
-## 🛠️ Technology Stack
+## Features
 
-- **Backend:** Python 3.10+ / FastAPI (high-speed asynchronous REST API)
-- **Database:** SQLite 3 (lightweight, zero-config local persistence with foreign key constraints)
-- **Validation:** Pydantic v2 schemas
-- **Frontend:** Vanilla HTML5, Modern CSS3 (Dark Fintech Design System with Glassmorphism), JavaScript (ES6+ SPA)
-- **Data Visualization:** Chart.js & Lucide Icons
-- **Currency Engine:** Vietnamese Dong (VND: `xx.xxx.xxx ₫`)
+- Financial dashboard with income, expense, surplus, and trend analysis
+- Financial Health Score based on savings, spending, and emergency runway
+- Goal planner with multiple strategy modes
+- Spending anomaly detection using statistical analysis
+- What-if simulation for purchase, salary, and budget change scenarios
+- Sandboxed financial actions and approval flow
+- Audit log tracking
+- AI copilot/chat assistant (optional, only when OpenRouter key is configured)
 
 ---
 
-## 🚀 Windows Setup & Run Instructions
+## Tech stack
 
-### Prerequisites
-- Python 3.10 or higher installed on Windows.
-- PowerShell or Command Prompt.
+- Backend: Python, FastAPI
+- Database: SQLite
+- Frontend: HTML, CSS, JavaScript
+- Validation: Pydantic
+- Visualization: Chart.js
+- Testing: pytest
 
-### Step 1: Clone or Navigate to Directory
-```powershell
-cd c:\Users\trann\OneDrive\Desktop\Fintechathon
+---
+
+## Prerequisites
+
+- Python 3.10+
+- pip
+- Git
+- A terminal such as PowerShell, Command Prompt, or bash
+
+---
+
+## Quick start
+
+### 1. Clone the project
+
+```bash
+git clone <https://github.com/trumbuffban/FinAgent_clone>
+cd FinAgent_clone
 ```
 
-### Step 2: Install Dependencies
+### 2. Create and activate a virtual environment
+
+On Windows PowerShell:
+
 ```powershell
+python -m venv .venv
+.\.venv\Scripts\Activate.ps1
+```
+
+On macOS/Linux:
+
+```bash
+python3 -m venv .venv
+source .venv/bin/activate
+```
+
+### 3. Install dependencies
+
+```bash
 pip install -r requirements.txt
 ```
 
-### Step 3: Launch the Application
-Run the local FastAPI server:
-```powershell
+### 4. Configure environment variables (optional but recommended)
+
+A sample environment file is included:
+
+- `.env.example`
+
+Copy it to `.env` if you want to enable the AI copilot with OpenRouter:
+
+```bash
+copy .env.example .env
+```
+
+Then edit `.env` and set your OpenRouter API key if needed:
+
+```env
+OPENROUTER_API_KEY=your_key_here
+OPENROUTER_MODEL=google/gemini-2.0-flash-001
+```
+
+If you leave the API key empty, the app still runs in deterministic local mode without external AI calls.
+
+### 5. Run the app
+
+From the project root:
+
+```bash
 uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
 ```
-Or simply run:
-```powershell
+
+Or:
+
+```bash
 python -m app.main
 ```
 
-### Step 4: Open in Web Browser
-Open your browser and navigate to:
-```
+### 6. Open the app
+
+Go to:
+
+```text
 http://127.0.0.1:8000
 ```
 
 ---
 
-## 🛡️ Security & Role-Based Access Control (RBAC)
+## AI copilot setup
 
-The application implements three permission tiers, switchable directly from the top-right header for easy evaluator testing:
+This project includes an AI finance assistant with optional OpenRouter integration.
 
-| Tier | Capabilities |
-| :--- | :--- |
-| **Viewer** | Read-only inspection of dashboards, goal trajectories, anomaly logs, and audit trails. |
-| **User** | Full access to add/delete transactions, generate AI plans, execute What-If simulations, and authorize Sandbox proposals. |
-| **Admin** | System management, audit trail inspection, and one-click database reset to initial demo state. |
+### If you want AI chat enabled
 
-For full security self-assessment, risk matrix, and credential isolation policies, see [docs/SECURITY.md](file:///c:/Users/trann/OneDrive/Desktop/Fintechathon/docs/SECURITY.md).
+1. Create `.env` from `.env.example`
+2. Add your `OPENROUTER_API_KEY`
+3. Restart the application
 
----
+### If you do not want AI chat enabled
 
-## 📐 Mathematical Models & Core Algorithms
+- Leave `OPENROUTER_API_KEY` blank
+- Or remove the line completely from `.env`
+- Or comment it out:
 
-For the detailed mathematical formulations of:
-1. Financial Health Score (4-Pillar Formulation)
-2. Statistical Z-Score Anomaly Detector
-3. 3-Plan Goal Generation & Optimization Logic
-4. What-If Simulation Calculus
-
-Please refer to the technical documentation in [docs/ALGORITHMS.md](file:///c:/Users/trann/OneDrive/Desktop/Fintechathon/docs/ALGORITHMS.md).
-
----
-
-## 🧪 Running Automated Tests
-
-Run the complete test suite with 100% pass rate:
-```powershell
-python -m pytest -v
+```env
+# OPENROUTER_API_KEY=your_key_here
 ```
 
-### Test Coverage Summary:
-- `tests/test_algorithms.py`: Validates Health Score calculation, Anomaly Z-Score detection, 3-tier Goal Planner feasibility, and What-If timeline impact.
-- `tests/test_api.py`: Validates FastAPI REST endpoints, RBAC permission tiers (403 forbidden vs 200 ok), Sandbox approval workflow, and database resets.
+Then restart the server:
+
+```bash
+uvicorn app.main:app --reload --host 127.0.0.1 --port 8000
+```
+
+When the key is empty, the app automatically runs in deterministic local mode without external AI calls.
+
+### Disable API usage completely
+
+If you want to fully disable external AI access:
+
+1. Open `.env`
+2. Change:
+
+```env
+OPENROUTER_API_KEY=your_key_here
+```
+
+to:
+
+```env
+OPENROUTER_API_KEY=
+```
+
+3. Save the file
+4. Restart the app
+
+This is the recommended option for local demo or offline testing.
 
 ---
 
-## 📂 Project Structure
+## Database behavior
 
+The project uses SQLite and creates/uses a local database file named `finances.db` automatically when the app starts.
+
+If the DB does not exist yet, the app will initialize it on startup.
+
+---
+
+## Testing
+
+Run tests with:
+
+```bash
+pytest -q
 ```
-Fintechathon/
+
+Or for full verbose output:
+
+```bash
+pytest -v
+```
+
+---
+
+## Project structure
+
+```text
+FinAgent_clone/
 ├── app/
 │   ├── __init__.py
-│   ├── main.py               # FastAPI entrypoint, lifespan, CORS, and routing
-│   ├── database.py           # SQLite connection & realistic VND demo data seeder
-│   ├── schemas.py            # Pydantic request & response validation models
-│   ├── security.py           # RBAC permission hierarchy & header verification
+│   ├── main.py
+│   ├── database.py
+│   ├── schemas.py
+│   ├── security.py
+│   ├── copilot/
+│   │   ├── __init__.py
+│   │   ├── bus.py
+│   │   ├── guardrails.py
+│   │   ├── hooks.py
+│   │   ├── nl_engine.py
+│   │   ├── schemas.py
+│   │   └── state.py
+│   ├── routers/
+│   │   ├── admin.py
+│   │   ├── audit.py
+│   │   ├── budgets.py
+│   │   ├── copilot.py
+│   │   ├── dashboard.py
+│   │   ├── goals.py
+│   │   ├── profile.py
+│   │   ├── quant.py
+│   │   ├── recurring.py
+│   │   ├── sandbox.py
+│   │   ├── simulation.py
+│   │   └── transactions.py
 │   ├── services/
-│   │   ├── health_score.py   # 0-100 Financial Health Score engine
-│   │   ├── planner.py        # 3-Tier savings goal generator
-│   │   ├── anomaly.py        # Moving average & Z-Score anomaly detector
-│   │   ├── simulator.py      # What-If decision simulation engine
-│   │   ├── tracker.py        # Milestone trajectory tracker
-│   │   ├── sandbox.py        # Staged proposal and approval lifecycle
-│   │   └── audit.py          # Immutable audit logging service
-│   └── routers/
-│       ├── dashboard.py      # Dashboard metrics & chart data
-│       ├── transactions.py   # Transactions CRUD & anomaly scanning
-│       ├── goals.py          # Goal management & plan calculators
-│       ├── simulation.py     # What-If simulation endpoint
-│       ├── sandbox.py        # Sandbox proposals & approvals
-│       ├── audit.py          # Audit trail inspection
-│       └── admin.py          # Database reset & system status
+│   │   ├── anomaly.py
+│   │   ├── assumptions.py
+│   │   ├── audit.py
+│   │   ├── budget_check.py
+│   │   ├── goal_prob.py
+│   │   ├── health_score.py
+│   │   ├── metrics.py
+│   │   ├── planner.py
+│   │   ├── quant.py
+│   │   ├── recurring.py
+│   │   ├── sandbox.py
+│   │   ├── simulator.py
+│   │   └── tracker.py
+│   └── templates/ (if present)
 ├── static/
-│   ├── index.html            # Responsive single-page web app
-│   ├── css/style.css         # Modern fintech dark theme & design system
-│   └── js/
-│       ├── app.js            # SPA controller & API client
-│       └── charts.js         # Chart.js rendering helpers
+│   ├── css/
+│   ├── js/
+│   └── index.html
 ├── docs/
-│   ├── ALGORITHMS.md         # Mathematical models & formulas
-│   └── SECURITY.md           # Security self-assessment & RBAC
+│   ├── ALGORITHMS.md
+│   └── SECURITY.md
+├── .env
+├── .env.example
+├── finances.db
+├── requirements.txt
+├── schema.sql
+├── sample_sandbox_logs.json
+├── README.md
 ├── tests/
-│   ├── test_algorithms.py    # Unit tests for core algorithms
-│   └── test_api.py           # API integration and security tests
-├── schema.sql                # Complete SQLite database schema
-├── sample_sandbox_logs.json  # Competition sample sandbox execution logs
-├── requirements.txt          # Python dependencies
-└── README.md                 # Project documentation & run guide
+│   ├── test_algorithms.py
+│   ├── test_api.py
+│   ├── test_health.py
+│   ├── test_planner.py
+│   └── test_quant.py
+└── .git/
 ```
+
+---
+
+## Notes
+
+- This project is built for local demo and evaluation.
+- The app is meant to be educational and simulated, not an investment recommendation engine.
+- The AI assistant can operate in local deterministic mode or with OpenRouter when configured.
+
+---
+
+## Troubleshooting
+
+### Port already in use
+
+If port 8000 is occupied, run:
+
+```bash
+uvicorn app.main:app --reload --host 127.0.0.1 --port 8001
+```
+
+### Module not found
+
+Make sure your virtual environment is active and dependencies are installed:
+
+```bash
+pip install -r requirements.txt
+```
+
+### AI chat is slow or unavailable
+
+- Check whether `OPENROUTER_API_KEY` is set in `.env`
+- Confirm the internet connection is available
+- If the key is missing, the app will run without external AI
+
+---
+
+## License
+
+This project is provided as-is for educational and hackathon/demo use.
+
