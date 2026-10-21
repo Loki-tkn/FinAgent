@@ -31,8 +31,7 @@
             .replace(/&/g, '&amp;')
             .replace(/</g, '&lt;')
             .replace(/>/g, '&gt;')
-            .replace(/"/g, '&quot;')
-            .replace(/'/g, '&#39;');
+            .replace(/"/g, '&quot;');
     }
 
     // Markdown-lite Formatter for Financial Copilot
@@ -55,7 +54,7 @@
         escaped = escaped.replace(/\*([^*]+)\*/g, '<em>$1</em>');
 
         // Event / Proposal IDs: #42 or event #42 or proposal #12 -> interactive links
-        escaped = escaped.replace(/(?:event\s*#?|#)(\d+)\b/gi, function(match, id) {
+        escaped = escaped.replace(/(?:event\s*#?|(?<![&\w])#)(\d+)\b/gi, function (match, id) {
             return `<button type="button" class="copilot-event-link" onclick="window.askCopilotPrompt('Explain event ${id}')" title="Inspect event #${id}">${match}</button>`;
         });
 
